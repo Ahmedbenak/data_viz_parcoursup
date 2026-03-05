@@ -43,6 +43,32 @@ interface OrientationData {
   "Nombre de candidats bacheliers ayant accepté une proposition d'admission": string | number;
 }
 
+// Helper to get value from row with fallback for snake_case
+const getRowValue = (row: any, key: string) => {
+  if (row[key] !== undefined) return row[key];
+  
+  // Try snake_case version
+  const snakeKey = key
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // remove accents
+    .replace(/[^a-z0-9]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "");
+    
+  return row[snakeKey];
+};
+
+const mapSupabaseData = (rawData: any[]): OrientationData[] => {
+  return rawData.map(row => ({
+    "Enseignements de spécialité": getRowValue(row, "Enseignements de spécialité") || "",
+    "Formation": getRowValue(row, "Formation") || "",
+    "Nombre de candidats bacheliers ayant confirmé au moins un vœu": getRowValue(row, "Nombre de candidats bacheliers ayant confirmé au moins un vœu") || 0,
+    "Nombre de candidats bacheliers ayant reçu au moins une proposition d'admission": getRowValue(row, "Nombre de candidats bacheliers ayant reçu au moins une proposition d'admission") || 0,
+    "Nombre de candidats bacheliers ayant accepté une proposition d'admission": getRowValue(row, "Nombre de candidats bacheliers ayant accepté une proposition d'admission") || 0,
+  }));
+};
+
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f59e0b', '#10b981', '#06b6d4'];
 
 export default function App() {
@@ -62,24 +88,35 @@ export default function App() {
     const loadInitialData = async () => {
       try {
         setLoading(true);
+        console.log('Fetching data from table: parcoursup_1');
         const { data: orientationData, error } = await getSupabase()
-          .from('orientation_data')
+          .from('parcoursup_1')
           .select('*');
 
-        if (error) throw error;
+        if (error) {
+          console.error('Supabase query error:', error);
+          throw error;
+        }
 
-        if (orientationData) {
-          setData(orientationData as OrientationData[]);
+        console.log('Data fetched successfully:', orientationData?.length, 'rows');
+
+        if (orientationData && orientationData.length > 0) {
+          console.log('Sample row keys:', Object.keys(orientationData[0]));
+          const mappedData = mapSupabaseData(orientationData);
+          setData(mappedData);
           
           // Set default specialty if available
-          const specialties = Array.from(new Set(orientationData.map(item => item["Enseignements de spécialité"]))).filter(Boolean);
+          const specialties = Array.from(new Set(mappedData.map(item => item["Enseignements de spécialité"]))).filter(Boolean);
           if (specialties.length > 0 && !selectedSpecialty) {
-            setSelectedSpecialty(specialties[0]);
+            setSelectedSpecialty(specialties[0] as string);
           }
+        } else {
+          console.warn('No data found in table parcoursup_1');
+          setError("Aucune donnée trouvée dans la table 'parcoursup_1'. Vérifiez que votre table contient des données.");
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Error loading data from Supabase:', err);
-        setError("Erreur lors de la récupération des données depuis Supabase. Vérifiez votre configuration.");
+        setError(`Erreur lors de la récupération des données : ${err.message || 'Erreur inconnue'}`);
       } finally {
         setLoading(false);
       }
