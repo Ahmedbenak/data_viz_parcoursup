@@ -43,94 +43,13 @@ interface OrientationData {
   "candidats_proposition_acceptee": number;
 }
 
-// Helper to get value from row with flexible key matching
-const getRowValue = (row: any, key: string) => {
-  if (!row) return undefined;
-  if (row[key] !== undefined) return row[key];
-  
-  const normalizedTarget = key.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  const snakeTarget = normalizedTarget.replace(/[^a-z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
-  
-  if (row[snakeTarget] !== undefined) return row[snakeTarget];
-
-  // Specific mapping for the new columns if they are requested by old names
-  const mapping: Record<string, string> = {
-    "enseignements_de_specialite": "specialites",
-    "formation": "formation",
-    "nombre_de_candidats_bacheliers_ayant_confirme_au_moins_un_voeu": "candidats_voeu_confirme",
-    "nombre_de_candidats_bacheliers_ayant_recu_au_moins_une_proposition_d_admission": "candidats_proposition_recue",
-    "nombre_de_candidats_bacheliers_ayant_accepte_une_proposition_d_admission": "candidats_proposition_acceptee"
-  };
-
-  if (mapping[snakeTarget] && row[mapping[snakeTarget]] !== undefined) {
-    return row[mapping[snakeTarget]];
-  }
-
-  const actualKeys = Object.keys(row);
-  
-  // 1. Try exact match after normalization
-  for (const k of actualKeys) {
-    const nk = k.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    if (nk === normalizedTarget || nk === snakeTarget) return row[k];
-  }
-
-  // 2. Try partial match for specialty
-  if (normalizedTarget.includes("specialite")) {
-    const k = actualKeys.find(key => key.toLowerCase().includes("specialite"));
-    if (k) return row[k];
-  }
-
-  // 3. Try partial match for formation
-  if (normalizedTarget.includes("formation")) {
-    const k = actualKeys.find(key => key.toLowerCase().includes("formation"));
-    if (k) return row[k];
-  }
-
-  // 4. Try partial match for voeux/candidats
-  if (normalizedTarget.includes("voeu") || normalizedTarget.includes("candidat")) {
-    const k = actualKeys.find(key => key.toLowerCase().includes("voeu") || key.toLowerCase().includes("candidat"));
-    if (k) return row[k];
-  }
-    
-  return undefined;
-};
-
-// Helper to find the actual column name for a given logical name
-const findColumnName = (sampleRow: any, logicalName: string): string => {
-  if (!sampleRow) return logicalName;
-  if (sampleRow[logicalName] !== undefined) return logicalName;
-
-  const normalizedTarget = logicalName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  const snakeTarget = normalizedTarget.replace(/[^a-z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
-  
-  // New column mappings
-  if (snakeTarget.includes("specialite")) return "specialites";
-  if (snakeTarget.includes("formation")) return "formation";
-  if (snakeTarget.includes("confirme")) return "candidats_voeu_confirme";
-  if (snakeTarget.includes("recue")) return "candidats_proposition_recue";
-  if (snakeTarget.includes("acceptee")) return "candidats_proposition_acceptee";
-
-  const actualKeys = Object.keys(sampleRow);
-  for (const k of actualKeys) {
-    const nk = k.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    if (nk === normalizedTarget || nk === snakeTarget) return k;
-  }
-
-  if (normalizedTarget.includes("specialite")) {
-    const k = actualKeys.find(key => key.toLowerCase().includes("specialite"));
-    if (k) return k;
-  }
-
-  return logicalName;
-};
-
 const mapSupabaseData = (rawData: any[]): OrientationData[] => {
   return rawData.map(row => ({
-    "specialites": row.specialites || getRowValue(row, "specialites") || "",
-    "formation": row.formation || getRowValue(row, "formation") || "",
-    "candidats_voeu_confirme": Number(row.candidats_voeu_confirme || getRowValue(row, "candidats_voeu_confirme") || 0),
-    "candidats_proposition_recue": Number(row.candidats_proposition_recue || getRowValue(row, "candidats_proposition_recue") || 0),
-    "candidats_proposition_acceptee": Number(row.candidats_proposition_acceptee || getRowValue(row, "candidats_proposition_acceptee") || 0),
+    "specialites": row.specialites || "",
+    "formation": row.formation || "",
+    "candidats_voeu_confirme": Number(row.candidats_voeu_confirme || 0),
+    "candidats_proposition_recue": Number(row.candidats_proposition_recue || 0),
+    "candidats_proposition_acceptee": Number(row.candidats_proposition_acceptee || 0),
   }));
 };
 
@@ -143,8 +62,6 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [dbStatus, setDbStatus] = useState<'checking' | 'connected' | 'error'>('checking');
-  const [dbErrorMessage, setDbErrorMessage] = useState<string | null>(null);
   const [onboardingComplete, setOnboardingComplete] = useState(false);
   const [onboardingData, setOnboardingData] = useState<OnboardingData | null>(null);
   const [sortConfig, setSortConfig] = useState<{ key: 'name' | 'voeux' | 'admissions' | 'taux', direction: 'asc' | 'desc' }>({
@@ -156,89 +73,29 @@ export default function App() {
   const loadSpecialties = async () => {
     try {
       setLoading(true);
-      setDbStatus('checking');
-      setDbErrorMessage(null);
+      setError(null);
       const supabase = getSupabase();
       
-      // Discover column names first by fetching 1 row
-      const { data: sampleData, error: sampleError } = await supabase
-        .from('parcoursup_1')
-        .select('*')
-        .limit(1);
-
-      if (sampleError) {
-        console.error('Supabase error:', sampleError);
-        // Try fallback table name if 'parcoursup_1' doesn't exist
-        if (sampleError.code === '42P01') { // relation does not exist
-          const { data: fallbackData, error: fallbackError } = await supabase
-            .from('parcoursup')
-            .select('*')
-            .limit(1);
-          
-          if (fallbackError) {
-            setDbErrorMessage(`Table 'parcoursup_1' ou 'parcoursup' introuvable. Code: ${fallbackError.code}`);
-            throw fallbackError;
-          }
-          if (!fallbackData || fallbackData.length === 0) {
-            setDbErrorMessage("Les tables sont vides.");
-            throw new Error("Les tables 'parcoursup_1' et 'parcoursup' sont introuvables ou vides.");
-          }
-          // If fallback worked, use it
-          const specialtyCol = findColumnName(fallbackData[0], "Enseignements de spécialité");
-          const { data: specialtyData, error: specError } = await supabase
-            .from('parcoursup')
-            .select(specialtyCol);
-          
-          if (specError) throw specError;
-          
-          const uniqueSpecialties = Array.from(new Set(
-            specialtyData
-              .map(item => item[specialtyCol])
-              .filter(Boolean)
-          )).sort() as string[];
-
-          setSpecialties(uniqueSpecialties);
-          setDbStatus('connected');
-          setLoading(false);
-          return;
-        }
-        setDbErrorMessage(`Erreur Supabase: ${sampleError.message} (Code: ${sampleError.code})`);
-        throw sampleError;
-      }
-      
-      if (!sampleData || sampleData.length === 0) {
-        setDbErrorMessage("La table 'parcoursup_1' est vide.");
-        throw new Error("La table 'parcoursup_1' existe mais elle est vide. Veuillez importer vos données.");
-      }
-
-      setDbStatus('connected');
-      const specialtyCol = findColumnName(sampleData[0], "Enseignements de spécialité");
-      console.log('Detected specialty column:', specialtyCol);
-
-      // Fetch all unique specialties
       const { data: specData, error: specError } = await supabase
         .from('parcoursup_1')
-        .select(specialtyCol);
+        .select('specialites');
 
       if (specError) throw specError;
 
       if (specData) {
-        const uniqueSpecs = Array.from(new Set(specData.map(row => row[specialtyCol])))
+        const uniqueSpecs = Array.from(new Set(specData.map(row => row.specialites)))
           .filter(Boolean)
           .sort() as string[];
         
         setSpecialties(uniqueSpecs);
         
-        // If we have specialties, select the first one by default if none selected
         if (uniqueSpecs.length > 0 && !selectedSpecialty) {
           setSelectedSpecialty(uniqueSpecs[0]);
         }
       }
     } catch (err: any) {
       console.error('Error loading specialties:', err);
-      setError(`Erreur lors du chargement des spécialités : ${err.message}`);
-      setDbStatus('error');
-      if (!dbErrorMessage) setDbErrorMessage(err.message);
+      setError("Erreur lors du chargement des spécialités.");
     } finally {
       setLoading(false);
     }
@@ -248,7 +105,6 @@ export default function App() {
     loadSpecialties();
   }, []);
 
-  // Step 2: Load full data for the selected specialty
   useEffect(() => {
     const loadSpecialtyData = async () => {
       if (!selectedSpecialty) return;
@@ -257,14 +113,10 @@ export default function App() {
         setLoadingDetails(true);
         const supabase = getSupabase();
         
-        // We need to find the column name again or store it
-        const { data: sampleData } = await supabase.from('parcoursup_1').select('*').limit(1);
-        const specialtyCol = findColumnName(sampleData?.[0], "Enseignements de spécialité");
-
         const { data: orientationData, error: fetchError } = await supabase
           .from('parcoursup_1')
           .select('*')
-          .eq(specialtyCol, selectedSpecialty);
+          .eq('specialites', selectedSpecialty);
 
         if (fetchError) throw fetchError;
 
@@ -274,7 +126,7 @@ export default function App() {
         }
       } catch (err: any) {
         console.error('Error loading specialty data:', err);
-        setError(`Erreur lors du chargement des données de la spécialité : ${err.message}`);
+        setError("Erreur lors du chargement des données.");
       } finally {
         setLoadingDetails(false);
       }
@@ -412,40 +264,6 @@ export default function App() {
           </div>
           
           <div className="flex items-center gap-4">
-            {/* Connection Test Indicator */}
-            <div className="group relative">
-              <div className={cn(
-                "flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all duration-500",
-                dbStatus === 'checking' && "bg-slate-50 border-slate-200 text-slate-400",
-                dbStatus === 'connected' && "bg-emerald-50 border-emerald-100 text-emerald-600",
-                dbStatus === 'error' && "bg-rose-50 border-rose-100 text-rose-600 cursor-pointer hover:bg-rose-100"
-              )}
-              onClick={() => dbStatus === 'error' && loadSpecialties()}
-              >
-                <div className={cn(
-                  "w-2 h-2 rounded-full",
-                  dbStatus === 'checking' && "bg-slate-300 animate-pulse",
-                  dbStatus === 'connected' && "bg-emerald-500",
-                  dbStatus === 'error' && "bg-rose-500"
-                )} />
-                <span className="text-[10px] font-bold uppercase tracking-wider">
-                  {dbStatus === 'checking' && "Vérification base..."}
-                  {dbStatus === 'connected' && "Base connectée"}
-                  {dbStatus === 'error' && "Erreur base (cliquer pour réessayer)"}
-                </span>
-              </div>
-              
-              {dbStatus === 'error' && dbErrorMessage && (
-                <div className="absolute top-full right-0 mt-2 w-64 p-3 bg-white rounded-xl shadow-2xl border border-rose-100 text-[11px] text-rose-600 z-50 animate-in fade-in slide-in-from-top-2">
-                  <p className="font-bold mb-1">Détails de l'erreur :</p>
-                  <p className="opacity-80 leading-relaxed">{dbErrorMessage}</p>
-                  <div className="mt-2 pt-2 border-t border-rose-50 font-medium">
-                    Conseil : Vérifiez que la table <code className="bg-rose-50 px-1 rounded">parcoursup_1</code> existe et que les politiques RLS permettent la lecture.
-                  </div>
-                </div>
-              )}
-            </div>
-
             {onboardingData && (
               <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-full border border-slate-100">
                 <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
