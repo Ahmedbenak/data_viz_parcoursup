@@ -124,6 +124,7 @@ export default function App() {
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dbStatus, setDbStatus] = useState<'checking' | 'connected' | 'error'>('checking');
+  const [dbErrorMessage, setDbErrorMessage] = useState<string | null>(null);
   const [onboardingComplete, setOnboardingComplete] = useState(false);
   const [onboardingData, setOnboardingData] = useState<OnboardingData | null>(null);
   const [sortConfig, setSortConfig] = useState<{ key: 'name' | 'voeux' | 'admissions' | 'taux', direction: 'asc' | 'desc' }>({
@@ -132,57 +133,98 @@ export default function App() {
   });
 
   // Step 1: Load unique specialties from Supabase
-  useEffect(() => {
-    const loadSpecialties = async () => {
-      try {
-        setLoading(true);
-        setDbStatus('checking');
-        const supabase = getSupabase();
-        
-        // Discover column names first by fetching 1 row
-        const { data: sampleData, error: sampleError } = await supabase
-          .from('parcoursup_1')
-          .select('*')
-          .limit(1);
+  const loadSpecialties = async () => {
+    try {
+      setLoading(true);
+      setDbStatus('checking');
+      setDbErrorMessage(null);
+      const supabase = getSupabase();
+      
+      // Discover column names first by fetching 1 row
+      const { data: sampleData, error: sampleError } = await supabase
+        .from('parcoursup_1')
+        .select('*')
+        .limit(1);
 
-        if (sampleError) throw sampleError;
-        
-        if (!sampleData || sampleData.length === 0) {
-          throw new Error("La table 'parcoursup_1' est vide.");
-        }
-
-        setDbStatus('connected');
-        const specialtyCol = findColumnName(sampleData[0], "Enseignements de spécialité");
-        console.log('Detected specialty column:', specialtyCol);
-
-        // Fetch all unique specialties
-        const { data: specData, error: specError } = await supabase
-          .from('parcoursup_1')
-          .select(specialtyCol);
-
-        if (specError) throw specError;
-
-        if (specData) {
-          const uniqueSpecs = Array.from(new Set(specData.map(row => row[specialtyCol])))
-            .filter(Boolean)
-            .sort() as string[];
+      if (sampleError) {
+        console.error('Supabase error:', sampleError);
+        // Try fallback table name if 'parcoursup_1' doesn't exist
+        if (sampleError.code === '42P01') { // relation does not exist
+          const { data: fallbackData, error: fallbackError } = await supabase
+            .from('parcoursup')
+            .select('*')
+            .limit(1);
           
-          setSpecialties(uniqueSpecs);
-          
-          // If we have specialties, select the first one by default if none selected
-          if (uniqueSpecs.length > 0 && !selectedSpecialty) {
-            setSelectedSpecialty(uniqueSpecs[0]);
+          if (fallbackError) {
+            setDbErrorMessage(`Table 'parcoursup_1' ou 'parcoursup' introuvable. Code: ${fallbackError.code}`);
+            throw fallbackError;
           }
-        }
-      } catch (err: any) {
-        console.error('Error loading specialties:', err);
-        setError(`Erreur lors du chargement des spécialités : ${err.message}`);
-        setDbStatus('error');
-      } finally {
-        setLoading(false);
-      }
-    };
+          if (!fallbackData || fallbackData.length === 0) {
+            setDbErrorMessage("Les tables sont vides.");
+            throw new Error("Les tables 'parcoursup_1' et 'parcoursup' sont introuvables ou vides.");
+          }
+          // If fallback worked, use it
+          const specialtyCol = findColumnName(fallbackData[0], "Enseignements de spécialité");
+          const { data: specialtyData, error: specError } = await supabase
+            .from('parcoursup')
+            .select(specialtyCol);
+          
+          if (specError) throw specError;
+          
+          const uniqueSpecialties = Array.from(new Set(
+            specialtyData
+              .map(item => item[specialtyCol])
+              .filter(Boolean)
+          )).sort() as string[];
 
+          setSpecialties(uniqueSpecialties);
+          setDbStatus('connected');
+          setLoading(false);
+          return;
+        }
+        setDbErrorMessage(`Erreur Supabase: ${sampleError.message} (Code: ${sampleError.code})`);
+        throw sampleError;
+      }
+      
+      if (!sampleData || sampleData.length === 0) {
+        setDbErrorMessage("La table 'parcoursup_1' est vide.");
+        throw new Error("La table 'parcoursup_1' existe mais elle est vide. Veuillez importer vos données.");
+      }
+
+      setDbStatus('connected');
+      const specialtyCol = findColumnName(sampleData[0], "Enseignements de spécialité");
+      console.log('Detected specialty column:', specialtyCol);
+
+      // Fetch all unique specialties
+      const { data: specData, error: specError } = await supabase
+        .from('parcoursup_1')
+        .select(specialtyCol);
+
+      if (specError) throw specError;
+
+      if (specData) {
+        const uniqueSpecs = Array.from(new Set(specData.map(row => row[specialtyCol])))
+          .filter(Boolean)
+          .sort() as string[];
+        
+        setSpecialties(uniqueSpecs);
+        
+        // If we have specialties, select the first one by default if none selected
+        if (uniqueSpecs.length > 0 && !selectedSpecialty) {
+          setSelectedSpecialty(uniqueSpecs[0]);
+        }
+      }
+    } catch (err: any) {
+      console.error('Error loading specialties:', err);
+      setError(`Erreur lors du chargement des spécialités : ${err.message}`);
+      setDbStatus('error');
+      if (!dbErrorMessage) setDbErrorMessage(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     loadSpecialties();
   }, []);
 
@@ -351,23 +393,37 @@ export default function App() {
           
           <div className="flex items-center gap-4">
             {/* Connection Test Indicator */}
-            <div className={cn(
-              "flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all duration-500",
-              dbStatus === 'checking' && "bg-slate-50 border-slate-200 text-slate-400",
-              dbStatus === 'connected' && "bg-emerald-50 border-emerald-100 text-emerald-600",
-              dbStatus === 'error' && "bg-rose-50 border-rose-100 text-rose-600"
-            )}>
+            <div className="group relative">
               <div className={cn(
-                "w-2 h-2 rounded-full",
-                dbStatus === 'checking' && "bg-slate-300 animate-pulse",
-                dbStatus === 'connected' && "bg-emerald-500",
-                dbStatus === 'error' && "bg-rose-500"
-              )} />
-              <span className="text-[10px] font-bold uppercase tracking-wider">
-                {dbStatus === 'checking' && "Vérification base..."}
-                {dbStatus === 'connected' && "Base connectée"}
-                {dbStatus === 'error' && "Erreur base"}
-              </span>
+                "flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all duration-500",
+                dbStatus === 'checking' && "bg-slate-50 border-slate-200 text-slate-400",
+                dbStatus === 'connected' && "bg-emerald-50 border-emerald-100 text-emerald-600",
+                dbStatus === 'error' && "bg-rose-50 border-rose-100 text-rose-600 cursor-pointer hover:bg-rose-100"
+              )}
+              onClick={() => dbStatus === 'error' && loadSpecialties()}
+              >
+                <div className={cn(
+                  "w-2 h-2 rounded-full",
+                  dbStatus === 'checking' && "bg-slate-300 animate-pulse",
+                  dbStatus === 'connected' && "bg-emerald-500",
+                  dbStatus === 'error' && "bg-rose-500"
+                )} />
+                <span className="text-[10px] font-bold uppercase tracking-wider">
+                  {dbStatus === 'checking' && "Vérification base..."}
+                  {dbStatus === 'connected' && "Base connectée"}
+                  {dbStatus === 'error' && "Erreur base (cliquer pour réessayer)"}
+                </span>
+              </div>
+              
+              {dbStatus === 'error' && dbErrorMessage && (
+                <div className="absolute top-full right-0 mt-2 w-64 p-3 bg-white rounded-xl shadow-2xl border border-rose-100 text-[11px] text-rose-600 z-50 animate-in fade-in slide-in-from-top-2">
+                  <p className="font-bold mb-1">Détails de l'erreur :</p>
+                  <p className="opacity-80 leading-relaxed">{dbErrorMessage}</p>
+                  <div className="mt-2 pt-2 border-t border-rose-50 font-medium">
+                    Conseil : Vérifiez que la table <code className="bg-rose-50 px-1 rounded">parcoursup_1</code> existe et que les politiques RLS permettent la lecture.
+                  </div>
+                </div>
+              )}
             </div>
 
             {onboardingData && (
