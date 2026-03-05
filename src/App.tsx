@@ -123,6 +123,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [dbStatus, setDbStatus] = useState<'checking' | 'connected' | 'error'>('checking');
   const [onboardingComplete, setOnboardingComplete] = useState(false);
   const [onboardingData, setOnboardingData] = useState<OnboardingData | null>(null);
   const [sortConfig, setSortConfig] = useState<{ key: 'name' | 'voeux' | 'admissions' | 'taux', direction: 'asc' | 'desc' }>({
@@ -135,6 +136,7 @@ export default function App() {
     const loadSpecialties = async () => {
       try {
         setLoading(true);
+        setDbStatus('checking');
         const supabase = getSupabase();
         
         // Discover column names first by fetching 1 row
@@ -149,6 +151,7 @@ export default function App() {
           throw new Error("La table 'parcoursup_1' est vide.");
         }
 
+        setDbStatus('connected');
         const specialtyCol = findColumnName(sampleData[0], "Enseignements de spécialité");
         console.log('Detected specialty column:', specialtyCol);
 
@@ -174,6 +177,7 @@ export default function App() {
       } catch (err: any) {
         console.error('Error loading specialties:', err);
         setError(`Erreur lors du chargement des spécialités : ${err.message}`);
+        setDbStatus('error');
       } finally {
         setLoading(false);
       }
@@ -346,6 +350,26 @@ export default function App() {
           </div>
           
           <div className="flex items-center gap-4">
+            {/* Connection Test Indicator */}
+            <div className={cn(
+              "flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all duration-500",
+              dbStatus === 'checking' && "bg-slate-50 border-slate-200 text-slate-400",
+              dbStatus === 'connected' && "bg-emerald-50 border-emerald-100 text-emerald-600",
+              dbStatus === 'error' && "bg-rose-50 border-rose-100 text-rose-600"
+            )}>
+              <div className={cn(
+                "w-2 h-2 rounded-full",
+                dbStatus === 'checking' && "bg-slate-300 animate-pulse",
+                dbStatus === 'connected' && "bg-emerald-500",
+                dbStatus === 'error' && "bg-rose-500"
+              )} />
+              <span className="text-[10px] font-bold uppercase tracking-wider">
+                {dbStatus === 'checking' && "Vérification base..."}
+                {dbStatus === 'connected' && "Base connectée"}
+                {dbStatus === 'error' && "Erreur base"}
+              </span>
+            </div>
+
             {onboardingData && (
               <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-full border border-slate-100">
                 <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
