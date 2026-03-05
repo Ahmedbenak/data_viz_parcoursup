@@ -88,10 +88,6 @@ export default function App() {
           .sort() as string[];
         
         setSpecialties(uniqueSpecs);
-        
-        if (uniqueSpecs.length > 0 && !selectedSpecialty) {
-          setSelectedSpecialty(uniqueSpecs[0]);
-        }
       }
     } catch (err: any) {
       console.error('Error loading specialties:', err);
