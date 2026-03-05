@@ -22,10 +22,14 @@ import {
   ArrowRight,
   Info,
   GraduationCap,
-  LayoutDashboard
+  LayoutDashboard,
+  Settings,
+  ChevronUp,
+  ChevronDown
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import OnboardingQuestionnaire, { OnboardingData } from './components/OnboardingQuestionnaire';
 
 // Utility for tailwind classes
 function cn(...inputs: ClassValue[]) {
@@ -47,6 +51,12 @@ export default function App() {
   const [selectedSpecialty, setSelectedSpecialty] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [onboardingComplete, setOnboardingComplete] = useState(false);
+  const [onboardingData, setOnboardingData] = useState<OnboardingData | null>(null);
+  const [sortConfig, setSortConfig] = useState<{ key: 'name' | 'voeux' | 'admissions' | 'taux', direction: 'asc' | 'desc' }>({
+    key: 'taux',
+    direction: 'desc'
+  });
 
   // Load initial data
   useEffect(() => {
@@ -99,9 +109,36 @@ export default function App() {
     }
   };
 
+  const handleOnboardingComplete = (data: OnboardingData) => {
+    setOnboardingData(data);
+    setOnboardingComplete(true);
+  };
+
   const specialties = useMemo(() => {
     return Array.from(new Set(data.map(item => item["Enseignements de spécialité"]))).filter(Boolean);
   }, [data]);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  const filteredSpecialties = useMemo(() => {
+    return specialties.filter(spec => 
+      spec.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [specialties, searchQuery]);
+
+  const handleSpecialtySelect = (spec: string) => {
+    setSelectedSpecialty(spec);
+    setSearchQuery(spec);
+    setShowSuggestions(false);
+  };
+
+  // Update search query when selectedSpecialty changes (e.g. on initial load)
+  useEffect(() => {
+    if (selectedSpecialty && !searchQuery) {
+      setSearchQuery(selectedSpecialty);
+    }
+  }, [selectedSpecialty]);
 
   const filteredData = useMemo(() => {
     if (!selectedSpecialty) return [];
@@ -126,7 +163,7 @@ export default function App() {
   }, [filteredData]);
 
   const formationsData = useMemo(() => {
-    return filteredData
+    const baseData = filteredData
       .filter(item => item["Formation"] && !item["Formation"].toLowerCase().includes("ensemble des bacheliers"))
       .map(item => {
         const voeux = Number(item["Nombre de candidats bacheliers ayant confirmé au moins un vœu"]) || 0;
@@ -139,11 +176,44 @@ export default function App() {
           admissions,
           taux
         };
-      })
-      .sort((a, b) => b.voeux - a.voeux);
-  }, [filteredData]);
+      });
 
-  const topFormations = formationsData.slice(0, 5);
+    return [...baseData].sort((a, b) => {
+      const aValue = a[sortConfig.key];
+      const bValue = b[sortConfig.key];
+
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        return sortConfig.direction === 'asc' 
+          ? aValue.localeCompare(bValue)
+          : bValue.localeCompare(aValue);
+      }
+
+      const aNum = aValue as number;
+      const bNum = bValue as number;
+
+      return sortConfig.direction === 'asc' ? aNum - bNum : bNum - aNum;
+    });
+  }, [filteredData, sortConfig]);
+
+  const topFormations = useMemo(() => {
+    // Top formations for charts should probably always be by volume (voeux) or we can use the sorted data
+    // Let's keep it by volume for consistent charts or use the first 5 of sorted data?
+    // User asked for sorting the "details" section, so let's keep charts stable by volume or use sorted.
+    // Usually charts represent the "top" by a fixed metric.
+    return [...formationsData].sort((a, b) => b.voeux - a.voeux).slice(0, 5);
+  }, [formationsData]);
+
+  const handleSort = (key: 'name' | 'voeux' | 'admissions' | 'taux') => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'desc' ? 'asc' : 'desc'
+    }));
+  };
+
+  const SortIcon = ({ column }: { column: 'name' | 'voeux' | 'admissions' | 'taux' }) => {
+    if (sortConfig.key !== column) return null;
+    return sortConfig.direction === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />;
+  };
 
   if (loading) {
     return (
@@ -151,6 +221,10 @@ export default function App() {
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-600"></div>
       </div>
     );
+  }
+
+  if (!onboardingComplete) {
+    return <OnboardingQuestionnaire onComplete={handleOnboardingComplete} />;
   }
 
   return (
@@ -168,6 +242,21 @@ export default function App() {
           </div>
           
           <div className="flex items-center gap-4">
+            {onboardingData && (
+              <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-full border border-slate-100">
+                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                  Profil: {onboardingData.academy}
+                </span>
+              </div>
+            )}
+            <button 
+              onClick={() => setOnboardingComplete(false)}
+              className="p-2 text-slate-400 hover:text-indigo-600 transition-colors"
+              title="Modifier mon profil"
+            >
+              <Settings className="w-5 h-5" />
+            </button>
             <label className="cursor-pointer flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors">
               <Upload className="w-4 h-4" />
               <span className="hidden md:inline">Importer un CSV</span>
@@ -188,19 +277,45 @@ export default function App() {
           </p>
           
           <div className="relative max-w-xl mx-auto">
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none z-10">
               <Search className="h-5 w-5 text-slate-400" />
             </div>
-            <select
-              value={selectedSpecialty}
-              onChange={(e) => setSelectedSpecialty(e.target.value)}
-              className="block w-full pl-11 pr-10 py-4 text-base border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-lg rounded-2xl bg-white shadow-xl shadow-indigo-100/50 appearance-none transition-all"
-            >
-              <option value="" disabled>Sélectionne tes spécialités...</option>
-              {specialties.map((spec) => (
-                <option key={spec} value={spec}>{spec}</option>
-              ))}
-            </select>
+            <input
+              type="text"
+              placeholder="Recherche tes spécialités..."
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setShowSuggestions(true);
+              }}
+              onFocus={() => setShowSuggestions(true)}
+              className="block w-full pl-11 pr-10 py-4 text-base border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-lg rounded-2xl bg-white shadow-xl shadow-indigo-100/50 transition-all"
+            />
+            
+            {showSuggestions && filteredSpecialties.length > 0 && (
+              <div className="absolute z-50 w-full mt-2 bg-white rounded-2xl shadow-2xl border border-slate-100 max-h-60 overflow-y-auto custom-scrollbar">
+                {filteredSpecialties.map((spec) => (
+                  <button
+                    key={spec}
+                    onClick={() => handleSpecialtySelect(spec)}
+                    className={cn(
+                      "w-full text-left px-5 py-3 hover:bg-indigo-50 transition-colors text-slate-700 font-medium border-b border-slate-50 last:border-none",
+                      selectedSpecialty === spec && "bg-indigo-50 text-indigo-600"
+                    )}
+                  >
+                    {spec}
+                  </button>
+                ))}
+              </div>
+            )}
+            
+            {/* Click outside to close suggestions */}
+            {showSuggestions && (
+              <div 
+                className="fixed inset-0 z-40" 
+                onClick={() => setShowSuggestions(false)}
+              />
+            )}
           </div>
         </section>
 
@@ -310,20 +425,65 @@ export default function App() {
 
             {/* Detailed Table */}
             <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+              <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <h3 className="text-lg font-bold text-slate-900">Détails des formations</h3>
-                <span className="text-xs font-medium px-2.5 py-1 bg-slate-100 text-slate-600 rounded-full">
-                  {formationsData.length} filières trouvées
-                </span>
+                <div className="flex items-center gap-3">
+                  <button 
+                    onClick={() => handleSort('taux')}
+                    className={cn(
+                      "text-xs font-bold px-4 py-2 rounded-xl transition-all flex items-center gap-2",
+                      sortConfig.key === 'taux' 
+                        ? "bg-indigo-600 text-white shadow-lg shadow-indigo-100" 
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    )}
+                  >
+                    <TrendingUp className="w-3.5 h-3.5" />
+                    Trier par taux d'accès
+                    {sortConfig.key === 'taux' && (
+                      sortConfig.direction === 'desc' ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />
+                    )}
+                  </button>
+                  <span className="text-xs font-medium px-2.5 py-1 bg-slate-50 text-slate-400 rounded-full border border-slate-100">
+                    {formationsData.length} filières
+                  </span>
+                </div>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-50/50">
-                      <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Formation</th>
-                      <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Vœux</th>
-                      <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Admissions</th>
-                      <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Taux d'accès</th>
+                      <th 
+                        className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors"
+                        onClick={() => handleSort('name')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Formation <SortIcon column="name" />
+                        </div>
+                      </th>
+                      <th 
+                        className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right cursor-pointer hover:bg-slate-100 transition-colors"
+                        onClick={() => handleSort('voeux')}
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          Vœux <SortIcon column="voeux" />
+                        </div>
+                      </th>
+                      <th 
+                        className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right cursor-pointer hover:bg-slate-100 transition-colors"
+                        onClick={() => handleSort('admissions')}
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          Admissions <SortIcon column="admissions" />
+                        </div>
+                      </th>
+                      <th 
+                        className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right cursor-pointer hover:bg-slate-100 transition-colors"
+                        onClick={() => handleSort('taux')}
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          Taux d'accès <SortIcon column="taux" />
+                        </div>
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
