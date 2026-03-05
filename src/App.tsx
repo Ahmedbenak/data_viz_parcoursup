@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import Papa from 'papaparse';
+import { getSupabase } from './lib/supabase';
 import { 
   BarChart, 
   Bar, 
@@ -15,7 +15,6 @@ import {
 } from 'recharts';
 import { 
   Search, 
-  Upload, 
   TrendingUp, 
   Users, 
   CheckCircle, 
@@ -58,56 +57,35 @@ export default function App() {
     direction: 'desc'
   });
 
-  // Load initial data
+  // Load initial data from Supabase
   useEffect(() => {
     const loadInitialData = async () => {
       try {
-        const response = await fetch('/data_orientation.csv');
-        if (!response.ok) throw new Error('Failed to fetch');
-        const csvText = await response.text();
-        parseCSV(csvText);
+        setLoading(true);
+        const { data: orientationData, error } = await getSupabase()
+          .from('orientation_data')
+          .select('*');
+
+        if (error) throw error;
+
+        if (orientationData) {
+          setData(orientationData as OrientationData[]);
+          
+          // Set default specialty if available
+          const specialties = Array.from(new Set(orientationData.map(item => item["Enseignements de spécialité"]))).filter(Boolean);
+          if (specialties.length > 0 && !selectedSpecialty) {
+            setSelectedSpecialty(specialties[0]);
+          }
+        }
       } catch (err) {
-        console.error('Error loading initial CSV:', err);
+        console.error('Error loading data from Supabase:', err);
+        setError("Erreur lors de la récupération des données depuis Supabase. Vérifiez votre configuration.");
+      } finally {
         setLoading(false);
       }
     };
     loadInitialData();
   }, []);
-
-  const parseCSV = (csvText: string) => {
-    Papa.parse(csvText, {
-      header: true,
-      skipEmptyLines: true,
-      complete: (results) => {
-        const parsedData = results.data as OrientationData[];
-        setData(parsedData);
-        
-        // Set default specialty if available
-        const specialties = Array.from(new Set(parsedData.map(item => item["Enseignements de spécialité"]))).filter(Boolean);
-        if (specialties.length > 0 && !selectedSpecialty) {
-          setSelectedSpecialty(specialties[0]);
-        }
-        setLoading(false);
-      },
-      error: (err) => {
-        setError("Erreur lors de la lecture du fichier CSV.");
-        setLoading(false);
-      }
-    });
-  };
-
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setLoading(true);
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const text = e.target?.result as string;
-        parseCSV(text);
-      };
-      reader.readAsText(file);
-    }
-  };
 
   const handleOnboardingComplete = (data: OnboardingData) => {
     setOnboardingData(data);
@@ -257,11 +235,6 @@ export default function App() {
             >
               <Settings className="w-5 h-5" />
             </button>
-            <label className="cursor-pointer flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors">
-              <Upload className="w-4 h-4" />
-              <span className="hidden md:inline">Importer un CSV</span>
-              <input type="file" accept=".csv" onChange={handleFileUpload} className="hidden" />
-            </label>
           </div>
         </div>
       </header>
