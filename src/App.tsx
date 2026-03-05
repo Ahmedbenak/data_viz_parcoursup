@@ -43,20 +43,65 @@ interface OrientationData {
   "Nombre de candidats bacheliers ayant accepté une proposition d'admission": string | number;
 }
 
-// Helper to get value from row with fallback for snake_case
+// Helper to get value from row with flexible key matching
 const getRowValue = (row: any, key: string) => {
+  if (!row) return undefined;
   if (row[key] !== undefined) return row[key];
   
-  // Try snake_case version
-  const snakeKey = key
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "") // remove accents
-    .replace(/[^a-z0-9]/g, "_")
-    .replace(/_+/g, "_")
-    .replace(/^_|_$/g, "");
+  const normalizedTarget = key.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const snakeTarget = normalizedTarget.replace(/[^a-z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
+  
+  if (row[snakeTarget] !== undefined) return row[snakeTarget];
+
+  const actualKeys = Object.keys(row);
+  
+  // 1. Try exact match after normalization
+  for (const k of actualKeys) {
+    const nk = k.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    if (nk === normalizedTarget || nk === snakeTarget) return row[k];
+  }
+
+  // 2. Try partial match for specialty
+  if (normalizedTarget.includes("specialite")) {
+    const k = actualKeys.find(key => key.toLowerCase().includes("specialite"));
+    if (k) return row[k];
+  }
+
+  // 3. Try partial match for formation
+  if (normalizedTarget.includes("formation")) {
+    const k = actualKeys.find(key => key.toLowerCase().includes("formation"));
+    if (k) return row[k];
+  }
+
+  // 4. Try partial match for voeux/candidats
+  if (normalizedTarget.includes("voeu") || normalizedTarget.includes("candidat")) {
+    const k = actualKeys.find(key => key.toLowerCase().includes("voeu") || key.toLowerCase().includes("candidat"));
+    if (k) return row[k];
+  }
     
-  return row[snakeKey];
+  return undefined;
+};
+
+// Helper to find the actual column name for a given logical name
+const findColumnName = (sampleRow: any, logicalName: string): string => {
+  if (!sampleRow) return logicalName;
+  if (sampleRow[logicalName] !== undefined) return logicalName;
+
+  const normalizedTarget = logicalName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const snakeTarget = normalizedTarget.replace(/[^a-z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
+  
+  const actualKeys = Object.keys(sampleRow);
+  for (const k of actualKeys) {
+    const nk = k.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    if (nk === normalizedTarget || nk === snakeTarget) return k;
+  }
+
+  if (normalizedTarget.includes("specialite")) {
+    const k = actualKeys.find(key => key.toLowerCase().includes("specialite"));
+    if (k) return k;
+  }
+
+  return logicalName;
 };
 
 const mapSupabaseData = (rawData: any[]): OrientationData[] => {
@@ -73,8 +118,10 @@ const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f59e0b', '#10b981'
 
 export default function App() {
   const [data, setData] = useState<OrientationData[]>([]);
+  const [specialties, setSpecialties] = useState<string[]>([]);
   const [selectedSpecialty, setSelectedSpecialty] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const [loadingDetails, setLoadingDetails] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [onboardingComplete, setOnboardingComplete] = useState(false);
   const [onboardingData, setOnboardingData] = useState<OnboardingData | null>(null);
@@ -83,55 +130,97 @@ export default function App() {
     direction: 'desc'
   });
 
-  // Load initial data from Supabase
+  // Step 1: Load unique specialties from Supabase
   useEffect(() => {
-    const loadInitialData = async () => {
+    const loadSpecialties = async () => {
       try {
         setLoading(true);
-        console.log('Fetching data from table: parcoursup_1');
-        const { data: orientationData, error } = await getSupabase()
+        const supabase = getSupabase();
+        
+        // Discover column names first by fetching 1 row
+        const { data: sampleData, error: sampleError } = await supabase
           .from('parcoursup_1')
-          .select('*');
+          .select('*')
+          .limit(1);
 
-        if (error) {
-          console.error('Supabase query error:', error);
-          throw error;
+        if (sampleError) throw sampleError;
+        
+        if (!sampleData || sampleData.length === 0) {
+          throw new Error("La table 'parcoursup_1' est vide.");
         }
 
-        console.log('Data fetched successfully:', orientationData?.length, 'rows');
+        const specialtyCol = findColumnName(sampleData[0], "Enseignements de spécialité");
+        console.log('Detected specialty column:', specialtyCol);
 
-        if (orientationData && orientationData.length > 0) {
-          console.log('Sample row keys:', Object.keys(orientationData[0]));
-          const mappedData = mapSupabaseData(orientationData);
-          setData(mappedData);
+        // Fetch all unique specialties
+        const { data: specData, error: specError } = await supabase
+          .from('parcoursup_1')
+          .select(specialtyCol);
+
+        if (specError) throw specError;
+
+        if (specData) {
+          const uniqueSpecs = Array.from(new Set(specData.map(row => row[specialtyCol])))
+            .filter(Boolean)
+            .sort() as string[];
           
-          // Set default specialty if available
-          const specialties = Array.from(new Set(mappedData.map(item => item["Enseignements de spécialité"]))).filter(Boolean);
-          if (specialties.length > 0 && !selectedSpecialty) {
-            setSelectedSpecialty(specialties[0] as string);
+          setSpecialties(uniqueSpecs);
+          
+          // If we have specialties, select the first one by default if none selected
+          if (uniqueSpecs.length > 0 && !selectedSpecialty) {
+            setSelectedSpecialty(uniqueSpecs[0]);
           }
-        } else {
-          console.warn('No data found in table parcoursup_1');
-          setError("Aucune donnée trouvée dans la table 'parcoursup_1'. Vérifiez que votre table contient des données.");
         }
       } catch (err: any) {
-        console.error('Error loading data from Supabase:', err);
-        setError(`Erreur lors de la récupération des données : ${err.message || 'Erreur inconnue'}`);
+        console.error('Error loading specialties:', err);
+        setError(`Erreur lors du chargement des spécialités : ${err.message}`);
       } finally {
         setLoading(false);
       }
     };
-    loadInitialData();
+
+    loadSpecialties();
   }, []);
+
+  // Step 2: Load full data for the selected specialty
+  useEffect(() => {
+    const loadSpecialtyData = async () => {
+      if (!selectedSpecialty) return;
+
+      try {
+        setLoadingDetails(true);
+        const supabase = getSupabase();
+        
+        // We need to find the column name again or store it
+        const { data: sampleData } = await supabase.from('parcoursup_1').select('*').limit(1);
+        const specialtyCol = findColumnName(sampleData?.[0], "Enseignements de spécialité");
+
+        const { data: orientationData, error: fetchError } = await supabase
+          .from('parcoursup_1')
+          .select('*')
+          .eq(specialtyCol, selectedSpecialty);
+
+        if (fetchError) throw fetchError;
+
+        if (orientationData) {
+          const mappedData = mapSupabaseData(orientationData);
+          setData(mappedData);
+        }
+      } catch (err: any) {
+        console.error('Error loading specialty data:', err);
+        setError(`Erreur lors du chargement des données de la spécialité : ${err.message}`);
+      } finally {
+        setLoadingDetails(false);
+      }
+    };
+
+    loadSpecialtyData();
+  }, [selectedSpecialty]);
 
   const handleOnboardingComplete = (data: OnboardingData) => {
     setOnboardingData(data);
     setOnboardingComplete(true);
   };
-
-  const specialties = useMemo(() => {
-    return Array.from(new Set(data.map(item => item["Enseignements de spécialité"]))).filter(Boolean);
-  }, [data]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -157,7 +246,7 @@ export default function App() {
 
   const filteredData = useMemo(() => {
     if (!selectedSpecialty) return [];
-    return data.filter(item => item["Enseignements de spécialité"] === selectedSpecialty);
+    return data; // Data is already filtered by Supabase query
   }, [data, selectedSpecialty]);
 
   const globalStats = useMemo(() => {
@@ -292,15 +381,25 @@ export default function App() {
             </div>
             <input
               type="text"
-              placeholder="Recherche tes spécialités..."
+              placeholder={loading ? "Chargement des spécialités..." : "Recherche tes spécialités..."}
+              disabled={loading}
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
                 setShowSuggestions(true);
               }}
               onFocus={() => setShowSuggestions(true)}
-              className="block w-full pl-11 pr-10 py-4 text-base border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-lg rounded-2xl bg-white shadow-xl shadow-indigo-100/50 transition-all"
+              className={cn(
+                "block w-full pl-11 pr-10 py-4 text-base border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-lg rounded-2xl bg-white shadow-xl shadow-indigo-100/50 transition-all",
+                loading && "opacity-50 cursor-not-allowed"
+              )}
             />
+            
+            {loading && (
+              <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            )}
             
             {showSuggestions && filteredSpecialties.length > 0 && (
               <div className="absolute z-50 w-full mt-2 bg-white rounded-2xl shadow-2xl border border-slate-100 max-h-60 overflow-y-auto custom-scrollbar">
@@ -330,7 +429,15 @@ export default function App() {
         </section>
 
         {selectedSpecialty ? (
-          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 relative">
+            {loadingDetails && (
+              <div className="absolute inset-0 bg-white/40 backdrop-blur-[2px] z-10 flex items-center justify-center rounded-3xl">
+                <div className="flex flex-col items-center gap-4 bg-white p-8 rounded-2xl shadow-xl border border-slate-100">
+                  <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                  <p className="font-bold text-slate-900">Mise à jour des données...</p>
+                </div>
+              </div>
+            )}
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <StatCard 
