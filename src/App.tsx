@@ -36,11 +36,11 @@ function cn(...inputs: ClassValue[]) {
 }
 
 interface OrientationData {
-  "Enseignements de spécialité": string;
-  "Formation": string;
-  "Nombre de candidats bacheliers ayant confirmé au moins un vœu": string | number;
-  "Nombre de candidats bacheliers ayant reçu au moins une proposition d'admission": string | number;
-  "Nombre de candidats bacheliers ayant accepté une proposition d'admission": string | number;
+  "specialites": string;
+  "formation": string;
+  "candidats_voeu_confirme": number;
+  "candidats_proposition_recue": number;
+  "candidats_proposition_acceptee": number;
 }
 
 // Helper to get value from row with flexible key matching
@@ -52,6 +52,19 @@ const getRowValue = (row: any, key: string) => {
   const snakeTarget = normalizedTarget.replace(/[^a-z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
   
   if (row[snakeTarget] !== undefined) return row[snakeTarget];
+
+  // Specific mapping for the new columns if they are requested by old names
+  const mapping: Record<string, string> = {
+    "enseignements_de_specialite": "specialites",
+    "formation": "formation",
+    "nombre_de_candidats_bacheliers_ayant_confirme_au_moins_un_voeu": "candidats_voeu_confirme",
+    "nombre_de_candidats_bacheliers_ayant_recu_au_moins_une_proposition_d_admission": "candidats_proposition_recue",
+    "nombre_de_candidats_bacheliers_ayant_accepte_une_proposition_d_admission": "candidats_proposition_acceptee"
+  };
+
+  if (mapping[snakeTarget] && row[mapping[snakeTarget]] !== undefined) {
+    return row[mapping[snakeTarget]];
+  }
 
   const actualKeys = Object.keys(row);
   
@@ -90,6 +103,13 @@ const findColumnName = (sampleRow: any, logicalName: string): string => {
   const normalizedTarget = logicalName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   const snakeTarget = normalizedTarget.replace(/[^a-z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
   
+  // New column mappings
+  if (snakeTarget.includes("specialite")) return "specialites";
+  if (snakeTarget.includes("formation")) return "formation";
+  if (snakeTarget.includes("confirme")) return "candidats_voeu_confirme";
+  if (snakeTarget.includes("recue")) return "candidats_proposition_recue";
+  if (snakeTarget.includes("acceptee")) return "candidats_proposition_acceptee";
+
   const actualKeys = Object.keys(sampleRow);
   for (const k of actualKeys) {
     const nk = k.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -106,11 +126,11 @@ const findColumnName = (sampleRow: any, logicalName: string): string => {
 
 const mapSupabaseData = (rawData: any[]): OrientationData[] => {
   return rawData.map(row => ({
-    "Enseignements de spécialité": getRowValue(row, "Enseignements de spécialité") || "",
-    "Formation": getRowValue(row, "Formation") || "",
-    "Nombre de candidats bacheliers ayant confirmé au moins un vœu": getRowValue(row, "Nombre de candidats bacheliers ayant confirmé au moins un vœu") || 0,
-    "Nombre de candidats bacheliers ayant reçu au moins une proposition d'admission": getRowValue(row, "Nombre de candidats bacheliers ayant reçu au moins une proposition d'admission") || 0,
-    "Nombre de candidats bacheliers ayant accepté une proposition d'admission": getRowValue(row, "Nombre de candidats bacheliers ayant accepté une proposition d'admission") || 0,
+    "specialites": row.specialites || getRowValue(row, "specialites") || "",
+    "formation": row.formation || getRowValue(row, "formation") || "",
+    "candidats_voeu_confirme": Number(row.candidats_voeu_confirme || getRowValue(row, "candidats_voeu_confirme") || 0),
+    "candidats_proposition_recue": Number(row.candidats_proposition_recue || getRowValue(row, "candidats_proposition_recue") || 0),
+    "candidats_proposition_acceptee": Number(row.candidats_proposition_acceptee || getRowValue(row, "candidats_proposition_acceptee") || 0),
   }));
 };
 
@@ -297,12 +317,12 @@ export default function App() {
 
   const globalStats = useMemo(() => {
     const stats = filteredData.find(item => 
-      item["Formation"] && item["Formation"].toLowerCase().includes("ensemble des bacheliers")
+      item.formation && item.formation.toLowerCase().includes("ensemble des bacheliers")
     );
     if (!stats) return null;
 
-    const voeux = Number(stats["Nombre de candidats bacheliers ayant confirmé au moins un vœu"]) || 0;
-    const admissions = Number(stats["Nombre de candidats bacheliers ayant reçu au moins une proposition d'admission"]) || 0;
+    const voeux = stats.candidats_voeu_confirme || 0;
+    const admissions = stats.candidats_proposition_recue || 0;
     const taux = voeux > 0 ? Math.round((admissions / voeux) * 100) : 0;
 
     return {
@@ -314,14 +334,14 @@ export default function App() {
 
   const formationsData = useMemo(() => {
     const baseData = filteredData
-      .filter(item => item["Formation"] && !item["Formation"].toLowerCase().includes("ensemble des bacheliers"))
+      .filter(item => item.formation && !item.formation.toLowerCase().includes("ensemble des bacheliers"))
       .map(item => {
-        const voeux = Number(item["Nombre de candidats bacheliers ayant confirmé au moins un vœu"]) || 0;
-        const admissions = Number(item["Nombre de candidats bacheliers ayant reçu au moins une proposition d'admission"]) || 0;
+        const voeux = item.candidats_voeu_confirme || 0;
+        const admissions = item.candidats_proposition_recue || 0;
         const taux = voeux > 0 ? Math.round((admissions / voeux) * 100) : 0;
         
         return {
-          name: item["Formation"],
+          name: item.formation,
           voeux,
           admissions,
           taux
