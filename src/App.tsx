@@ -22,9 +22,10 @@ import {
   Info,
   GraduationCap,
   LayoutDashboard,
-  Settings,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  MapPin,
+  Target
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -55,6 +56,15 @@ const mapSupabaseData = (rawData: any[]): OrientationData[] => {
 
 const COLORS = ['#e30613', '#f43f5e', '#ec4899', '#8b5cf6', '#6366f1', '#10b981', '#06b6d4'];
 
+const ACADEMIES = [
+  "Aix-Marseille", "Amiens", "Besançon", "Bordeaux", "Clermont-Ferrand", 
+  "Corse", "Créteil", "Dijon", "Grenoble", "Lille", "Limoges", "Lyon", 
+  "Montpellier", "Nancy-Metz", "Nantes", "Nice", "Normandie", 
+  "Orléans-Tours", "Paris", "Poitiers", "Reims", "Rennes", 
+  "Strasbourg", "Toulouse", "Versailles", "Guyane", "La Réunion", 
+  "Martinique", "Mayotte"
+];
+
 export default function App() {
   const [data, setData] = useState<OrientationData[]>([]);
   const [specialties, setSpecialties] = useState<string[]>([]);
@@ -64,6 +74,15 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [onboardingComplete, setOnboardingComplete] = useState(false);
   const [onboardingData, setOnboardingData] = useState<OnboardingData | null>(null);
+  
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  // Dashboard Filters
+  const [filterAcademy, setFilterAcademy] = useState<string>('');
+  const [filterMobility, setFilterMobility] = useState<boolean>(false);
+  const [filterAverage, setFilterAverage] = useState<string>('');
+  
   const [sortConfig, setSortConfig] = useState<{ key: 'name' | 'voeux' | 'admissions' | 'taux', direction: 'asc' | 'desc' }>({
     key: 'taux',
     direction: 'desc'
@@ -133,11 +152,15 @@ export default function App() {
 
   const handleOnboardingComplete = (data: OnboardingData) => {
     setOnboardingData(data);
+    if (data.specialty) {
+      setSelectedSpecialty(data.specialty);
+      setSearchQuery(data.specialty);
+    }
+    setFilterAcademy(data.academy);
+    setFilterMobility(data.stayInAcademy);
+    setFilterAverage(data.averageBac);
     setOnboardingComplete(true);
   };
-
-  const [searchQuery, setSearchQuery] = useState('');
-  const [showSuggestions, setShowSuggestions] = useState(false);
 
   const filteredSpecialties = useMemo(() => {
     return specialties.filter(spec => 
@@ -163,25 +186,8 @@ export default function App() {
     return data; // Data is already filtered by Supabase query
   }, [data, selectedSpecialty]);
 
-  const globalStats = useMemo(() => {
-    const stats = filteredData.find(item => 
-      item.formation && item.formation.toLowerCase().includes("ensemble des bacheliers")
-    );
-    if (!stats) return null;
-
-    const voeux = stats.candidats_voeu_confirme || 0;
-    const admissions = stats.candidats_proposition_recue || 0;
-    const taux = voeux > 0 ? Math.round((admissions / voeux) * 100) : 0;
-
-    return {
-      voeux,
-      admissions,
-      taux
-    };
-  }, [filteredData]);
-
   const formationsData = useMemo(() => {
-    const baseData = filteredData
+    let baseData = filteredData
       .filter(item => item.formation && !item.formation.toLowerCase().includes("ensemble des bacheliers"))
       .map(item => {
         const voeux = item.candidats_voeu_confirme || 0;
@@ -192,9 +198,18 @@ export default function App() {
           name: item.formation,
           voeux,
           admissions,
-          taux
+          taux,
+          academy: (item as any).academie || '' 
         };
       });
+
+    // Apply Academy Filter
+    if (filterAcademy) {
+      const hasAcademyColumn = baseData.some(d => d.academy);
+      if (hasAcademyColumn) {
+        baseData = baseData.filter(d => d.academy === filterAcademy);
+      }
+    }
 
     return [...baseData].sort((a, b) => {
       const aValue = a[sortConfig.key];
@@ -211,7 +226,21 @@ export default function App() {
 
       return sortConfig.direction === 'asc' ? aNum - bNum : bNum - aNum;
     });
-  }, [filteredData, sortConfig]);
+  }, [filteredData, sortConfig, filterAcademy]);
+
+  const globalStats = useMemo(() => {
+    if (formationsData.length === 0) return null;
+
+    const voeux = formationsData.reduce((acc, curr) => acc + curr.voeux, 0);
+    const admissions = formationsData.reduce((acc, curr) => acc + curr.admissions, 0);
+    const taux = voeux > 0 ? Math.round((admissions / voeux) * 100) : 0;
+
+    return {
+      voeux,
+      admissions,
+      taux
+    };
+  }, [formationsData]);
 
   const topFormations = useMemo(() => {
     // Top formations for charts should probably always be by volume (voeux) or we can use the sorted data
@@ -242,7 +271,13 @@ export default function App() {
   }
 
   if (!onboardingComplete) {
-    return <OnboardingQuestionnaire onComplete={handleOnboardingComplete} />;
+    return (
+      <OnboardingQuestionnaire 
+        onComplete={handleOnboardingComplete} 
+        specialties={specialties}
+        loadingSpecialties={loading}
+      />
+    );
   }
 
   return (
@@ -267,10 +302,11 @@ export default function App() {
             )}
             <button 
               onClick={() => setOnboardingComplete(false)}
-              className="p-2 text-white/80 hover:text-white hover:bg-white/10 rounded-full transition-all"
-              title="Modifier mon profil"
+              className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl border border-white/20 transition-all text-sm font-bold shadow-sm"
             >
-              <Settings className="w-5 h-5" />
+              <Users className="w-4 h-4" />
+              <span className="hidden sm:inline">Modifier mon profil</span>
+              <span className="sm:hidden">Profil</span>
             </button>
           </div>
         </div>
@@ -336,6 +372,85 @@ export default function App() {
                 onClick={() => setShowSuggestions(false)}
               />
             )}
+          </div>
+
+          {/* Quick Filters Section */}
+          <div className="mt-8 flex flex-col items-center gap-4 animate-in fade-in slide-in-from-top-2 duration-500">
+            <div className="flex items-center gap-2 text-slate-400 mb-1">
+              <LayoutDashboard className="w-4 h-4" />
+              <span className="text-xs font-bold uppercase tracking-widest">Filtres de ton profil</span>
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-4">
+              <div className="flex items-center gap-3 px-4 py-2 bg-white rounded-2xl border border-slate-200 shadow-sm hover:border-primary/30 transition-all">
+                <div className="w-8 h-8 bg-primary-light rounded-lg flex items-center justify-center">
+                  <MapPin className="w-4 h-4 text-primary" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Académie</span>
+                  <select 
+                    value={filterAcademy}
+                    onChange={(e) => setFilterAcademy(e.target.value)}
+                    className="text-sm font-bold text-slate-700 bg-transparent border-none p-0 focus:ring-0 cursor-pointer min-w-[140px]"
+                  >
+                    <option value="">Toutes les académies</option>
+                    {ACADEMIES.map(a => <option key={a} value={a}>{a}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 px-4 py-2 bg-white rounded-2xl border border-slate-200 shadow-sm hover:border-emerald-200 transition-all">
+                <div className="w-8 h-8 bg-emerald-50 rounded-lg flex items-center justify-center">
+                  <TrendingUp className="w-4 h-4 text-emerald-600" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Moyenne Bac</span>
+                  <div className="flex items-center gap-1">
+                    <input 
+                      type="text"
+                      value={filterAverage}
+                      onChange={(e) => setFilterAverage(e.target.value)}
+                      className="w-10 text-sm font-bold text-emerald-700 bg-transparent border-none p-0 focus:ring-0"
+                    />
+                    <span className="text-xs font-bold text-slate-400">/ 20</span>
+                  </div>
+                </div>
+              </div>
+
+              <button 
+                onClick={() => setFilterMobility(!filterMobility)}
+                className={cn(
+                  "flex items-center gap-3 px-4 py-2 rounded-2xl border transition-all shadow-sm group",
+                  filterMobility 
+                    ? "bg-primary border-primary text-white" 
+                    : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                )}
+              >
+                <div className={cn(
+                  "w-8 h-8 rounded-lg flex items-center justify-center transition-colors",
+                  filterMobility ? "bg-white/20" : "bg-slate-100 group-hover:bg-primary-light"
+                )}>
+                  <Target className={cn("w-4 h-4", filterMobility ? "text-white" : "text-slate-400 group-hover:text-primary")} />
+                </div>
+                <div className="flex flex-col items-start">
+                  <span className={cn("text-[10px] font-bold uppercase tracking-tight", filterMobility ? "text-white/70" : "text-slate-400")}>Mobilité</span>
+                  <span className="text-sm font-bold">{filterMobility ? "Ma zone" : "France entière"}</span>
+                </div>
+              </button>
+
+              {(filterAcademy !== onboardingData?.academy || filterAverage !== onboardingData?.averageBac || filterMobility !== onboardingData?.stayInAcademy) && (
+                <button 
+                  onClick={() => {
+                    setFilterAcademy(onboardingData?.academy || '');
+                    setFilterAverage(onboardingData?.averageBac || '');
+                    setFilterMobility(onboardingData?.stayInAcademy || false);
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-slate-400 hover:text-primary transition-all hover:bg-primary-light rounded-xl"
+                >
+                  <ArrowRight className="w-3 h-3 rotate-180" />
+                  Réinitialiser
+                </button>
+              )}
+            </div>
           </div>
         </section>
 
@@ -522,7 +637,14 @@ export default function App() {
                             <div className="w-8 h-8 rounded-lg bg-primary-light flex items-center justify-center text-primary font-bold text-xs">
                               {idx + 1}
                             </div>
-                            <span className="font-medium text-slate-700">{item.name}</span>
+                            <div className="flex flex-col">
+                              <span className="font-medium text-slate-700">{item.name}</span>
+                              {filterAverage && Number(filterAverage) >= 12 && item.taux > 40 && (
+                                <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-1">
+                                  <CheckCircle className="w-3 h-3" /> Profil compatible
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </td>
                         <td className="px-6 py-4 text-right text-slate-600 font-mono text-sm">{item.voeux.toLocaleString()}</td>
