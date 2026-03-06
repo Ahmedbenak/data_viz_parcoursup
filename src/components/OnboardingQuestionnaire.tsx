@@ -7,7 +7,6 @@ import {
   ChevronLeft, 
   Map as MapIcon, 
   Target, 
-  Sparkles,
   Search,
   GraduationCap
 } from 'lucide-react';
@@ -37,7 +36,6 @@ export interface OnboardingData {
   academy: string;
   specialty: string;
   stayInAcademy: boolean;
-  showLikelyAccepted: boolean;
   averageBac: string;
 }
 
@@ -47,7 +45,6 @@ export default function OnboardingQuestionnaire({ onComplete, specialties, loadi
     academy: '',
     specialty: '',
     stayInAcademy: false,
-    showLikelyAccepted: true,
     averageBac: ''
   });
   const [searchAcademy, setSearchAcademy] = useState('');
@@ -82,7 +79,7 @@ export default function OnboardingQuestionnaire({ onComplete, specialties, loadi
         <motion.div 
           className="h-full bg-primary"
           initial={{ width: '0%' }}
-          animate={{ width: `${(step / 4) * 100}%` }}
+          animate={{ width: `${(step / 3) * 100}%` }}
           transition={{ duration: 0.5 }}
         />
       </div>
@@ -287,66 +284,11 @@ export default function OnboardingQuestionnaire({ onComplete, specialties, loadi
                   <ChevronLeft className="w-4 h-4" /> Retour
                 </button>
                 <button 
-                  onClick={nextStep}
-                  disabled={!data.averageBac}
-                  className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-bold hover:bg-slate-800 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Continuer <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            </motion.div>
-          )}
-
-          {step === 4 && (
-            <motion.div
-              key="step4"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="bg-white p-8 rounded-[2.5rem] shadow-xl shadow-primary-light/50 border border-slate-100"
-            >
-              <div className="mb-8 text-center">
-                <div className="w-16 h-16 bg-primary rounded-[2rem] flex items-center justify-center mb-6 mx-auto shadow-xl shadow-primary-light">
-                  <Sparkles className="w-8 h-8 text-white" />
-                </div>
-                <h2 className="text-3xl font-bold text-slate-900 mb-2">Dernière étape !</h2>
-                <p className="text-slate-500">Optimisons tes chances de réussite.</p>
-              </div>
-
-              <div 
-                onClick={() => setData({ ...data, showLikelyAccepted: !data.showLikelyAccepted })}
-                className={cn(
-                  "p-8 rounded-[2rem] border-2 cursor-pointer transition-all mb-10 group",
-                  data.showLikelyAccepted 
-                    ? "border-primary bg-primary-light/30 shadow-lg shadow-primary-light" 
-                    : "border-slate-100 hover:border-primary/20"
-                )}
-              >
-                <div className="flex items-start gap-4">
-                  <div className={cn(
-                    "w-8 h-8 rounded-xl flex-shrink-0 flex items-center justify-center transition-colors",
-                    data.showLikelyAccepted ? "bg-primary text-white" : "bg-slate-100 text-slate-400 group-hover:bg-primary-light"
-                  )}>
-                    {data.showLikelyAccepted && <Check className="w-5 h-5" />}
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-xl text-slate-900 mb-1">Algorithme de prédiction</h3>
-                    <p className="text-slate-500 leading-relaxed">
-                      Je souhaite voir en priorité les établissements en France où je suis susceptible d'être accepté selon mon profil.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <button onClick={prevStep} className="text-slate-400 hover:text-slate-600 font-medium flex items-center gap-2">
-                  <ChevronLeft className="w-4 h-4" /> Retour
-                </button>
-                <button 
                   onClick={handleComplete}
-                  className="bg-primary text-white px-10 py-5 rounded-[1.5rem] font-bold hover:bg-primary-hover transition-all flex items-center gap-3 shadow-xl shadow-primary-light active:scale-95"
+                  disabled={!data.averageBac}
+                  className="bg-primary text-white px-10 py-4 rounded-2xl font-bold hover:bg-primary-hover transition-all flex items-center gap-3 shadow-xl shadow-primary-light active:scale-95"
                 >
-                  Découvrir mon profil <Sparkles className="w-5 h-5" />
+                  Découvrir mon profil <ChevronRight className="w-4 h-4" />
                 </button>
               </div>
             </motion.div>
