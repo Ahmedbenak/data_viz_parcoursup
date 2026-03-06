@@ -248,29 +248,26 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-primary-light selection:text-primary">
       {/* Header */}
-      <header className="bg-primary sticky top-0 z-50 shadow-md">
+      <header className="bg-primary sticky top-0 z-50 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <img 
-              src="https://upload.wikimedia.org/wikipedia/fr/thumb/b/b9/Logo_L%27%C3%89tudiant.svg/512px-Logo_L%27%C3%89tudiant.svg.png" 
-              alt="L'Étudiant" 
-              className="h-8 w-auto brightness-0 invert"
-              referrerPolicy="no-referrer"
-            />
+            <svg viewBox="0 0 160 40" className="h-9 w-auto fill-white" xmlns="http://www.w3.org/2000/svg">
+              <text x="0" y="32" font-family="Arial, sans-serif" font-weight="900" font-style="italic" font-size="28" fill="white">l'Étudiant</text>
+            </svg>
           </div>
           
           <div className="flex items-center gap-4">
             {onboardingData && (
-              <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-white/10 rounded-full border border-white/10">
+              <div className="hidden md:flex items-center gap-2 px-4 py-1.5 bg-white/20 rounded-full border border-white/30 backdrop-blur-sm">
                 <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-xs font-bold text-white uppercase tracking-wider">
+                <span className="text-xs font-bold text-white uppercase tracking-widest">
                   Profil: {onboardingData.academy}
                 </span>
               </div>
             )}
             <button 
               onClick={() => setOnboardingComplete(false)}
-              className="p-2 text-white/70 hover:text-white transition-colors"
+              className="p-2 text-white/80 hover:text-white hover:bg-white/10 rounded-full transition-all"
               title="Modifier mon profil"
             >
               <Settings className="w-5 h-5" />
@@ -564,12 +561,9 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row justify-between items-center gap-8">
             <div className="flex items-center gap-2">
-              <img 
-                src="https://upload.wikimedia.org/wikipedia/fr/thumb/b/b9/Logo_L%27%C3%89tudiant.svg/512px-Logo_L%27%C3%89tudiant.svg.png" 
-                alt="L'Étudiant" 
-                className="h-8 w-auto"
-                referrerPolicy="no-referrer"
-              />
+              <svg viewBox="0 0 160 40" className="h-8 w-auto fill-primary" xmlns="http://www.w3.org/2000/svg">
+                <text x="0" y="32" font-family="Arial, sans-serif" font-weight="900" font-style="italic" font-size="28" fill="currentColor">l'Étudiant</text>
+              </svg>
             </div>
             <p className="text-slate-500 text-sm">
               Données basées sur les statistiques officielles Parcoursup.
