@@ -53,7 +53,7 @@ const mapSupabaseData = (rawData: any[]): OrientationData[] => {
   }));
 };
 
-const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f59e0b', '#10b981', '#06b6d4'];
+const COLORS = ['#e30613', '#f43f5e', '#ec4899', '#8b5cf6', '#6366f1', '#10b981', '#06b6d4'];
 
 export default function App() {
   const [data, setData] = useState<OrientationData[]>([]);
@@ -236,7 +236,7 @@ export default function App() {
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
       </div>
     );
   }
@@ -246,31 +246,31 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-indigo-100 selection:text-indigo-900">
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-primary-light selection:text-primary">
       {/* Header */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
+      <header className="bg-primary sticky top-0 z-50 shadow-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="bg-indigo-600 p-2 rounded-lg">
-              <GraduationCap className="w-6 h-6 text-white" />
-            </div>
-            <h1 className="text-xl font-bold tracking-tight text-slate-900 hidden sm:block">
-              Orientation <span className="text-indigo-600">Post-Bac</span>
-            </h1>
+            <img 
+              src="https://upload.wikimedia.org/wikipedia/fr/thumb/b/b9/Logo_L%27%C3%89tudiant.svg/512px-Logo_L%27%C3%89tudiant.svg.png" 
+              alt="L'Étudiant" 
+              className="h-8 w-auto brightness-0 invert"
+              referrerPolicy="no-referrer"
+            />
           </div>
           
           <div className="flex items-center gap-4">
             {onboardingData && (
-              <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-full border border-slate-100">
-                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+              <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-white/10 rounded-full border border-white/10">
+                <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="text-xs font-bold text-white uppercase tracking-wider">
                   Profil: {onboardingData.academy}
                 </span>
               </div>
             )}
             <button 
               onClick={() => setOnboardingComplete(false)}
-              className="p-2 text-slate-400 hover:text-indigo-600 transition-colors"
+              className="p-2 text-white/70 hover:text-white transition-colors"
               title="Modifier mon profil"
             >
               <Settings className="w-5 h-5" />
@@ -304,14 +304,14 @@ export default function App() {
               }}
               onFocus={() => setShowSuggestions(true)}
               className={cn(
-                "block w-full pl-11 pr-10 py-4 text-base border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-lg rounded-2xl bg-white shadow-xl shadow-indigo-100/50 transition-all",
+                "block w-full pl-11 pr-10 py-4 text-base border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary sm:text-lg rounded-2xl bg-white shadow-xl shadow-primary-light/50 transition-all",
                 loading && "opacity-50 cursor-not-allowed"
               )}
             />
             
             {loading && (
               <div className="absolute right-4 top-1/2 -translate-y-1/2">
-                <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
               </div>
             )}
             
@@ -322,8 +322,8 @@ export default function App() {
                     key={spec}
                     onClick={() => handleSpecialtySelect(spec)}
                     className={cn(
-                      "w-full text-left px-5 py-3 hover:bg-indigo-50 transition-colors text-slate-700 font-medium border-b border-slate-50 last:border-none",
-                      selectedSpecialty === spec && "bg-indigo-50 text-indigo-600"
+                      "w-full text-left px-5 py-3 hover:bg-primary-light transition-colors text-slate-700 font-medium border-b border-slate-50 last:border-none",
+                      selectedSpecialty === spec && "bg-primary-light text-primary"
                     )}
                   >
                     {spec}
@@ -347,7 +347,7 @@ export default function App() {
             {loadingDetails && (
               <div className="absolute inset-0 bg-white/40 backdrop-blur-[2px] z-10 flex items-center justify-center rounded-3xl">
                 <div className="flex flex-col items-center gap-4 bg-white p-8 rounded-2xl shadow-xl border border-slate-100">
-                  <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                  <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
                   <p className="font-bold text-slate-900">Mise à jour des données...</p>
                 </div>
               </div>
@@ -371,9 +371,9 @@ export default function App() {
               <StatCard 
                 title="Taux d'Accès Global" 
                 value={globalStats ? `${globalStats.taux}%` : '0%'} 
-                icon={<TrendingUp className="w-6 h-6 text-indigo-600" />}
+                icon={<TrendingUp className="w-6 h-6 text-primary" />}
                 description="Chance moyenne d'obtenir une proposition"
-                color="indigo"
+                color="primary"
               />
             </div>
 
@@ -383,7 +383,7 @@ export default function App() {
               <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                    <LayoutDashboard className="w-5 h-5 text-indigo-600" />
+                    <LayoutDashboard className="w-5 h-5 text-primary" />
                     Top 5 des Formations Demandées
                   </h3>
                   <Info className="w-4 h-4 text-slate-400 cursor-help" />
@@ -407,7 +407,7 @@ export default function App() {
                       />
                       <Bar 
                         dataKey="voeux" 
-                        fill="#6366f1" 
+                        fill="#e30613" 
                         radius={[0, 8, 8, 0]} 
                         barSize={32}
                         name="Nombre de vœux"
@@ -464,7 +464,7 @@ export default function App() {
                     className={cn(
                       "text-xs font-bold px-4 py-2 rounded-xl transition-all flex items-center gap-2",
                       sortConfig.key === 'taux' 
-                        ? "bg-indigo-600 text-white shadow-lg shadow-indigo-100" 
+                        ? "bg-primary text-white shadow-lg shadow-primary-light" 
                         : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                     )}
                   >
@@ -522,7 +522,7 @@ export default function App() {
                       <tr key={idx} className="hover:bg-slate-50/50 transition-colors group">
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold text-xs">
+                            <div className="w-8 h-8 rounded-lg bg-primary-light flex items-center justify-center text-primary font-bold text-xs">
                               {idx + 1}
                             </div>
                             <span className="font-medium text-slate-700">{item.name}</span>
@@ -534,7 +534,7 @@ export default function App() {
                           <div className="flex items-center justify-end gap-2">
                             <div className="w-24 h-2 bg-slate-100 rounded-full overflow-hidden hidden sm:block">
                               <div 
-                                className="h-full bg-indigo-500 rounded-full" 
+                                className="h-full bg-primary rounded-full" 
                                 style={{ width: `${item.taux}%` }}
                               />
                             </div>
@@ -564,17 +564,19 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row justify-between items-center gap-8">
             <div className="flex items-center gap-2">
-              <div className="bg-slate-900 p-1.5 rounded-lg">
-                <GraduationCap className="w-5 h-5 text-white" />
-              </div>
-              <span className="font-bold text-slate-900">Orientation Post-Bac</span>
+              <img 
+                src="https://upload.wikimedia.org/wikipedia/fr/thumb/b/b9/Logo_L%27%C3%89tudiant.svg/512px-Logo_L%27%C3%89tudiant.svg.png" 
+                alt="L'Étudiant" 
+                className="h-8 w-auto"
+                referrerPolicy="no-referrer"
+              />
             </div>
             <p className="text-slate-500 text-sm">
               Données basées sur les statistiques officielles Parcoursup.
             </p>
             <div className="flex items-center gap-6">
-              <a href="#" className="text-slate-400 hover:text-indigo-600 transition-colors">Documentation</a>
-              <a href="#" className="text-slate-400 hover:text-indigo-600 transition-colors">Contact</a>
+              <a href="#" className="text-slate-400 hover:text-primary transition-colors">Documentation</a>
+              <a href="#" className="text-slate-400 hover:text-primary transition-colors">Contact</a>
             </div>
           </div>
         </div>
@@ -588,14 +590,14 @@ interface StatCardProps {
   value: string;
   icon: React.ReactNode;
   description: string;
-  color: 'blue' | 'emerald' | 'indigo';
+  color: 'blue' | 'emerald' | 'primary';
 }
 
 function StatCard({ title, value, icon, description, color }: StatCardProps) {
   const colorClasses = {
     blue: "bg-blue-50 border-blue-100",
     emerald: "bg-emerald-50 border-emerald-100",
-    indigo: "bg-indigo-50 border-indigo-100"
+    primary: "bg-primary-light border-primary/10"
   };
 
   return (

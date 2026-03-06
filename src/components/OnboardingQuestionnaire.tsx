@@ -82,7 +82,7 @@ export default function OnboardingQuestionnaire({ onComplete }: OnboardingProps)
       {/* Progress Bar */}
       <div className="fixed top-0 left-0 w-full h-1.5 bg-slate-200 z-50">
         <motion.div 
-          className="h-full bg-indigo-600"
+          className="h-full bg-primary"
           initial={{ width: '0%' }}
           animate={{ width: `${(step / 5) * 100}%` }}
           transition={{ duration: 0.5 }}
@@ -97,11 +97,11 @@ export default function OnboardingQuestionnaire({ onComplete }: OnboardingProps)
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
-              className="bg-white p-8 rounded-[2.5rem] shadow-xl shadow-indigo-100/50 border border-slate-100"
+              className="bg-white p-8 rounded-[2.5rem] shadow-xl shadow-primary-light/50 border border-slate-100"
             >
               <div className="mb-8">
-                <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center mb-6">
-                  <MapPin className="w-6 h-6 text-indigo-600" />
+                <div className="w-12 h-12 bg-primary-light rounded-2xl flex items-center justify-center mb-6">
+                  <MapPin className="w-6 h-6 text-primary" />
                 </div>
                 <h2 className="text-3xl font-bold text-slate-900 mb-2">Quelle est ton académie ?</h2>
                 <p className="text-slate-500">Cela nous aide à personnaliser les résultats selon ta zone géographique.</p>
@@ -114,7 +114,7 @@ export default function OnboardingQuestionnaire({ onComplete }: OnboardingProps)
                   placeholder="Rechercher une académie..."
                   value={searchAcademy}
                   onChange={(e) => setSearchAcademy(e.target.value)}
-                  className="w-full pl-12 pr-4 py-4 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-indigo-500 transition-all text-lg"
+                  className="w-full pl-12 pr-4 py-4 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-primary transition-all text-lg"
                 />
               </div>
 
@@ -129,8 +129,8 @@ export default function OnboardingQuestionnaire({ onComplete }: OnboardingProps)
                     className={cn(
                       "text-left px-5 py-4 rounded-2xl border transition-all duration-200 group",
                       data.academy === academy 
-                        ? "bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200" 
-                        : "bg-white border-slate-100 text-slate-700 hover:border-indigo-200 hover:bg-indigo-50/30"
+                        ? "bg-primary border-primary text-white shadow-lg shadow-primary-light" 
+                        : "bg-white border-slate-100 text-slate-700 hover:border-primary/20 hover:bg-primary-light/30"
                     )}
                   >
                     <span className="font-medium">{academy}</span>
@@ -147,7 +147,7 @@ export default function OnboardingQuestionnaire({ onComplete }: OnboardingProps)
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
-              className="bg-white p-8 rounded-[2.5rem] shadow-xl shadow-indigo-100/50 border border-slate-100"
+              className="bg-white p-8 rounded-[2.5rem] shadow-xl shadow-primary-light/50 border border-slate-100"
             >
               <div className="mb-8">
                 <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center mb-6">
@@ -163,13 +163,13 @@ export default function OnboardingQuestionnaire({ onComplete }: OnboardingProps)
                   className={cn(
                     "p-6 rounded-3xl border-2 transition-all text-center group",
                     data.stayInAcademy 
-                      ? "border-indigo-600 bg-indigo-50/50" 
-                      : "border-slate-100 hover:border-indigo-200"
+                      ? "border-primary bg-primary-light/50" 
+                      : "border-slate-100 hover:border-primary/20"
                   )}
                 >
                   <div className={cn(
                     "w-10 h-10 rounded-full mx-auto mb-3 flex items-center justify-center transition-colors",
-                    data.stayInAcademy ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-400 group-hover:bg-indigo-100"
+                    data.stayInAcademy ? "bg-primary text-white" : "bg-slate-100 text-slate-400 group-hover:bg-primary-light"
                   )}>
                     <Check className="w-6 h-6" />
                   </div>
@@ -182,13 +182,13 @@ export default function OnboardingQuestionnaire({ onComplete }: OnboardingProps)
                   className={cn(
                     "p-6 rounded-3xl border-2 transition-all text-center group",
                     !data.stayInAcademy 
-                      ? "border-indigo-600 bg-indigo-50/50" 
-                      : "border-slate-100 hover:border-indigo-200"
+                      ? "border-primary bg-primary-light/50" 
+                      : "border-slate-100 hover:border-primary/20"
                   )}
                 >
                   <div className={cn(
                     "w-10 h-10 rounded-full mx-auto mb-3 flex items-center justify-center transition-colors",
-                    !data.stayInAcademy ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-400 group-hover:bg-indigo-100"
+                    !data.stayInAcademy ? "bg-primary text-white" : "bg-slate-100 text-slate-400 group-hover:bg-primary-light"
                   )}>
                     <ChevronRight className="w-6 h-6" />
                   </div>
@@ -217,7 +217,7 @@ export default function OnboardingQuestionnaire({ onComplete }: OnboardingProps)
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
-              className="bg-white p-8 rounded-[2.5rem] shadow-xl shadow-indigo-100/50 border border-slate-100"
+              className="bg-white p-8 rounded-[2.5rem] shadow-xl shadow-primary-light/50 border border-slate-100"
             >
               <div className="mb-6">
                 <div className="w-12 h-12 bg-amber-50 rounded-2xl flex items-center justify-center mb-6">
@@ -243,8 +243,8 @@ export default function OnboardingQuestionnaire({ onComplete }: OnboardingProps)
                           className={cn(
                             "rounded-lg border transition-all flex items-center justify-center text-[10px] font-bold",
                             isSelected 
-                              ? "bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-200" 
-                              : "bg-slate-50 border-slate-100 text-slate-300 hover:bg-indigo-50 hover:text-indigo-400"
+                              ? "bg-primary border-primary text-white shadow-md shadow-primary-light" 
+                              : "bg-slate-50 border-slate-100 text-slate-300 hover:bg-primary-light hover:text-primary"
                           )}
                         >
                           {i + 1}
@@ -261,8 +261,8 @@ export default function OnboardingQuestionnaire({ onComplete }: OnboardingProps)
                     <span className="text-sm text-slate-400 italic">Aucun département sélectionné</span>
                   ) : (
                     data.selectedDepartments.map(dept => (
-                      <span key={dept} className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs font-bold flex items-center gap-1">
-                        {dept} <button onClick={() => toggleDepartment(dept)} className="hover:text-indigo-900">×</button>
+                      <span key={dept} className="px-3 py-1 bg-primary-light text-primary rounded-full text-xs font-bold flex items-center gap-1">
+                        {dept} <button onClick={() => toggleDepartment(dept)} className="hover:text-primary-hover">×</button>
                       </span>
                     ))
                   )}
@@ -289,11 +289,11 @@ export default function OnboardingQuestionnaire({ onComplete }: OnboardingProps)
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
-              className="bg-white p-8 rounded-[2.5rem] shadow-xl shadow-indigo-100/50 border border-slate-100"
+              className="bg-white p-8 rounded-[2.5rem] shadow-xl shadow-primary-light/50 border border-slate-100"
             >
               <div className="mb-8">
-                <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center mb-6">
-                  <GraduationCap className="w-6 h-6 text-indigo-600" />
+                <div className="w-12 h-12 bg-primary-light rounded-2xl flex items-center justify-center mb-6">
+                  <GraduationCap className="w-6 h-6 text-primary" />
                 </div>
                 <h2 className="text-3xl font-bold text-slate-900 mb-2">Moyenne au bac attendue</h2>
                 <p className="text-slate-500">Indique ta moyenne prévisionnelle pour affiner nos conseils.</p>
@@ -306,7 +306,7 @@ export default function OnboardingQuestionnaire({ onComplete }: OnboardingProps)
                   placeholder="Ex: 14.5"
                   value={data.averageBac}
                   onChange={handleAverageChange}
-                  className="w-full px-6 py-8 bg-slate-50 border-2 border-slate-100 rounded-[2rem] focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-4xl font-bold text-center text-indigo-600"
+                  className="w-full px-6 py-8 bg-slate-50 border-2 border-slate-100 rounded-[2rem] focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all text-4xl font-bold text-center text-primary"
                 />
                 <div className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-300 font-bold text-xl">
                   / 20
@@ -334,10 +334,10 @@ export default function OnboardingQuestionnaire({ onComplete }: OnboardingProps)
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
-              className="bg-white p-8 rounded-[2.5rem] shadow-xl shadow-indigo-100/50 border border-slate-100"
+              className="bg-white p-8 rounded-[2.5rem] shadow-xl shadow-primary-light/50 border border-slate-100"
             >
               <div className="mb-8 text-center">
-                <div className="w-16 h-16 bg-indigo-600 rounded-[2rem] flex items-center justify-center mb-6 mx-auto shadow-xl shadow-indigo-200">
+                <div className="w-16 h-16 bg-primary rounded-[2rem] flex items-center justify-center mb-6 mx-auto shadow-xl shadow-primary-light">
                   <Sparkles className="w-8 h-8 text-white" />
                 </div>
                 <h2 className="text-3xl font-bold text-slate-900 mb-2">Dernière étape !</h2>
@@ -349,14 +349,14 @@ export default function OnboardingQuestionnaire({ onComplete }: OnboardingProps)
                 className={cn(
                   "p-8 rounded-[2rem] border-2 cursor-pointer transition-all mb-10 group",
                   data.showLikelyAccepted 
-                    ? "border-indigo-600 bg-indigo-50/30 shadow-lg shadow-indigo-50" 
-                    : "border-slate-100 hover:border-indigo-200"
+                    ? "border-primary bg-primary-light/30 shadow-lg shadow-primary-light" 
+                    : "border-slate-100 hover:border-primary/20"
                 )}
               >
                 <div className="flex items-start gap-4">
                   <div className={cn(
                     "w-8 h-8 rounded-xl flex-shrink-0 flex items-center justify-center transition-colors",
-                    data.showLikelyAccepted ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-400 group-hover:bg-indigo-100"
+                    data.showLikelyAccepted ? "bg-primary text-white" : "bg-slate-100 text-slate-400 group-hover:bg-primary-light"
                   )}>
                     {data.showLikelyAccepted && <Check className="w-5 h-5" />}
                   </div>
@@ -375,7 +375,7 @@ export default function OnboardingQuestionnaire({ onComplete }: OnboardingProps)
                 </button>
                 <button 
                   onClick={handleComplete}
-                  className="bg-indigo-600 text-white px-10 py-5 rounded-[1.5rem] font-bold hover:bg-indigo-700 transition-all flex items-center gap-3 shadow-xl shadow-indigo-200 active:scale-95"
+                  className="bg-primary text-white px-10 py-5 rounded-[1.5rem] font-bold hover:bg-primary-hover transition-all flex items-center gap-3 shadow-xl shadow-primary-light active:scale-95"
                 >
                   Découvrir mon profil <Sparkles className="w-5 h-5" />
                 </button>
