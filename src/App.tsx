@@ -597,11 +597,11 @@ export default function App() {
           <div className="flex items-center gap-2">
             
             {/* 🔴 L'ancien <svg> a été remplacé par cette balise <img> */}
-            <img 
-              src="/Logo.png" 
-              alt="Logo l'Étudiant" 
-              className="h-9 w-auto object-contain" 
-            />
+          <img 
+            src="/Logo.png" 
+            alt="Logo l'Étudiant" 
+            className="h-9 w-auto object-contain brightness-0 invert" 
+          />
 
           </div>
           
