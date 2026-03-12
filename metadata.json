@@ -1,5 +1,5 @@
 {
   "name": "Orientation Post-Bac",
   "description": "Guide d'orientation interactif pour lycéens basé sur les statistiques de spécialités.",
-  "requestFramePermissions": []
+  "requestFramePermissions": ["geolocation"]
 }
