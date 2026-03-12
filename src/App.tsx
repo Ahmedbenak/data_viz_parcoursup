@@ -595,9 +595,14 @@ export default function App() {
       <header className="bg-primary sticky top-0 z-50 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <svg viewBox="0 0 160 40" className="h-9 w-auto fill-white" xmlns="http://www.w3.org/2000/svg">
-              <text x="0" y="32" fontFamily="Arial, sans-serif" fontWeight="900" fontStyle="italic" fontSize="28" fill="white">l'Étudiant</text>
-            </svg>
+            
+            {/* 🔴 L'ancien <svg> a été remplacé par cette balise <img> */}
+            <img 
+              src="/Logo.png" 
+              alt="Logo l'Étudiant" 
+              className="h-9 w-auto object-contain" 
+            />
+
           </div>
           
           <div className="flex items-center gap-4">
