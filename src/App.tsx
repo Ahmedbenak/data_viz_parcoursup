@@ -80,7 +80,7 @@ interface Parcoursup2Data {
   coordonnees_gps: string;
   eff_admis: number;
   capacite: number;
-  taux_acces: number;
+  taux_acces: number | null;
   note_moyenne: number;
   selectivite: string;
   pct_admis_neo_gen: number;
@@ -133,6 +133,8 @@ function MapUpdater({ center }: { center: [number, number] }) {
 export default function App() {
   const [data, setData] = useState<OrientationData[]>([]);
   const [detailedData, setDetailedData] = useState<Parcoursup2Data[]>([]);
+  const [mapSpecificData, setMapSpecificData] = useState<Parcoursup2Data[]>([]);
+  const [allFormationTypes, setAllFormationTypes] = useState<string[]>([]);
   const [specialties, setSpecialties] = useState<string[]>([]);
   const [selectedSpecialty, setSelectedSpecialty] = useState<string>('');
   const [loading, setLoading] = useState(true);
@@ -162,9 +164,14 @@ export default function App() {
     city: '',
     department: '',
     formationType: '',
-    radius: 100, // km
+    radius: 1000, // km (France entière par défaut)
     center: [46.603354, 1.888334] as [number, number] // France center
   });
+
+  const [allCities, setAllCities] = useState<string[]>([]);
+  const [showCitySuggestions, setShowCitySuggestions] = useState(false);
+  const [allDepartments, setAllDepartments] = useState<string[]>([]);
+  const [showDeptSuggestions, setShowDeptSuggestions] = useState(false);
 
   const handleLocateUser = () => {
     if (navigator.geolocation) {
@@ -182,13 +189,14 @@ export default function App() {
     }
   };
 
-  // Step 1: Load unique specialties from Supabase
-  const loadSpecialties = async () => {
+  // Step 1: Load unique specialties and all formation types
+  const loadInitialData = async () => {
     try {
       setLoading(true);
       setError(null);
       const supabase = getSupabase();
       
+      // Load Specialties
       const { data: specData, error: specError } = await supabase
         .from('parcoursup_1')
         .select('specialites');
@@ -202,17 +210,95 @@ export default function App() {
         
         setSpecialties(uniqueSpecs);
       }
+
+      // Load All Formation Types for the map
+      const { data: typeData, error: typeError } = await supabase
+        .from('parcoursup_2')
+        .select('filiere_generale');
+
+      if (!typeError && typeData) {
+        const uniqueTypes = Array.from(new Set(typeData.map(row => row.filiere_generale)))
+          .filter(Boolean)
+          .sort() as string[];
+        setAllFormationTypes(uniqueTypes);
+      }
+
+      // Load All Cities for the map filter
+      const { data: cityData, error: cityError } = await supabase
+        .from('parcoursup_2')
+        .select('commune');
+
+      if (!cityError && cityData) {
+        const uniqueCities = Array.from(new Set(cityData.map(row => row.commune)))
+          .filter(Boolean)
+          .sort() as string[];
+        setAllCities(uniqueCities);
+      }
+
+      // Load All Departments for the map filter
+      const { data: deptData, error: deptError } = await supabase
+        .from('parcoursup_2')
+        .select('departement');
+
+      if (!deptError && deptData) {
+        const uniqueDepts = Array.from(new Set(deptData.map(row => row.departement)))
+          .filter(Boolean)
+          .sort() as string[];
+        setAllDepartments(uniqueDepts);
+      }
     } catch (err: any) {
-      console.error('Error loading specialties:', err);
-      setError("Erreur lors du chargement des spécialités.");
+      console.error('Error loading initial data:', err);
+      setError("Erreur lors du chargement des données initiales.");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadSpecialties();
+    loadInitialData();
   }, []);
+
+  // Step 2: Load map specific data when formation type changes
+  useEffect(() => {
+    const loadMapData = async () => {
+      if (!geoFilter.formationType) {
+        setMapSpecificData([]);
+        return;
+      }
+      
+      try {
+        const supabase = getSupabase();
+        const { data: p2Data, error: p2Error } = await supabase
+          .from('parcoursup_2')
+          .select('*')
+          .eq('filiere_generale', geoFilter.formationType);
+          
+        if (!p2Error && p2Data) {
+          setMapSpecificData(p2Data.map(row => ({
+            filiere_generale: row.filiere_generale || "",
+            filiere_formation: row.filiere_formation || "",
+            etablissement: row.etablissement || "",
+            commune: row.commune || "",
+            departement: row.departement || "",
+            region: row.region || "",
+            coordonnees_gps: row.coordonnees_gps || "",
+            eff_admis: Number(row.eff_admis || 0),
+            capacite: Number(row.capacite || 0),
+            taux_acces: (row.taux_acces === "nd" || row.taux_acces === null) ? null : Number(row.taux_acces),
+            note_moyenne: Number(row.note_moyenne || 0),
+            selectivite: row.selectivite || "",
+            pct_admis_neo_gen: Number(row["pct_admis_neo_gen"] || 0),
+            pct_admis_neo_techno: Number(row["pct_admis_neo_techno"] || 0),
+            pct_admis_neo_pro: Number(row["pct_admis_neo_pro"] || 0),
+          })));
+        }
+      } catch (err) {
+        console.error("Error loading map data:", err);
+      }
+    };
+    
+    loadMapData();
+  }, [geoFilter.formationType]);
 
   useEffect(() => {
     const loadSpecialtyData = async () => {
@@ -254,7 +340,7 @@ export default function App() {
               coordonnees_gps: row.coordonnees_gps || "",
               eff_admis: Number(row.eff_admis || 0),
               capacite: Number(row.capacite || 0),
-              taux_acces: Number(row.taux_acces || 0),
+              taux_acces: (row.taux_acces === "nd" || row.taux_acces === null) ? null : Number(row.taux_acces),
               note_moyenne: Number(row.note_moyenne || 0),
               selectivite: row.selectivite || "",
               pct_admis_neo_gen: Number(row["pct_admis_neo_gen"] || 0),
@@ -363,7 +449,19 @@ export default function App() {
       return [];
     }
 
-    let base = detailedData;
+    // Combine detailedData (from Top 10) and mapSpecificData (from Map Filter)
+    // Use a Map to avoid duplicates by etablissement + filiere_formation + commune
+    const combinedMap = new Map<string, Parcoursup2Data>();
+    
+    detailedData.forEach(f => {
+      combinedMap.set(`${f.etablissement}-${f.filiere_formation}-${f.commune}`, f);
+    });
+    
+    mapSpecificData.forEach(f => {
+      combinedMap.set(`${f.etablissement}-${f.filiere_formation}-${f.commune}`, f);
+    });
+
+    let base = Array.from(combinedMap.values());
 
     // Filter by Formation Type
     if (geoFilter.formationType) {
@@ -405,11 +503,39 @@ export default function App() {
     }
 
     return mapped;
-  }, [detailedData, geoFilter, selectedForMap]);
+  }, [detailedData, mapSpecificData, geoFilter, selectedForMap]);
+
+  const groupedMapFormations = useMemo(() => {
+    const groups = new Map<string, (Parcoursup2Data & { position: [number, number] })[]>();
+    
+    mapFormations.forEach(f => {
+      const key = f.coordonnees_gps;
+      if (!groups.has(key)) {
+        groups.set(key, []);
+      }
+      groups.get(key)!.push(f as any);
+    });
+    
+    return Array.from(groups.values());
+  }, [mapFormations]);
 
   const formationTypes = useMemo(() => {
-    return Array.from(new Set(detailedData.map(f => f.filiere_generale))).sort();
-  }, [detailedData]);
+    return allFormationTypes;
+  }, [allFormationTypes]);
+
+  const filteredCities = useMemo(() => {
+    if (!geoFilter.city) return allCities.slice(0, 10);
+    return allCities
+      .filter(c => c.toLowerCase().includes(geoFilter.city.toLowerCase()))
+      .slice(0, 10);
+  }, [allCities, geoFilter.city]);
+
+  const filteredDepts = useMemo(() => {
+    if (!geoFilter.department) return allDepartments.slice(0, 10);
+    return allDepartments
+      .filter(d => d.toLowerCase().includes(geoFilter.department.toLowerCase()))
+      .slice(0, 10);
+  }, [allDepartments, geoFilter.department]);
 
   const globalStats = useMemo(() => {
     if (formationsData.length === 0) return null;
@@ -712,7 +838,7 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Pie Chart: Success Distribution */}
+              {/* Bar Chart: Access Rates by Field */}
               <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
@@ -723,27 +849,30 @@ export default function App() {
                 </div>
                 <div className="h-[350px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={topFormations}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={80}
-                        outerRadius={120}
-                        paddingAngle={5}
-                        dataKey="taux"
-                        nameKey="name"
-                      >
-                        {topFormations.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
+                    <BarChart data={topFormations} layout="vertical" margin={{ left: 40, right: 30 }}>
+                      <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#f1f5f9" />
+                      <XAxis type="number" domain={[0, 100]} unit="%" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                      <YAxis 
+                        dataKey="name" 
+                        type="category" 
+                        width={120} 
+                        tick={{ fontSize: 12, fill: '#64748b' }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
                       <Tooltip 
+                        cursor={{ fill: '#f8fafc' }}
                         contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
                         formatter={(value) => [`${value}%`, 'Taux d\'accès']}
                       />
-                      <Legend verticalAlign="bottom" height={36}/>
-                    </PieChart>
+                      <Bar 
+                        dataKey="taux" 
+                        fill="#10b981" 
+                        radius={[0, 8, 8, 0]} 
+                        barSize={32}
+                        name="Taux d'accès"
+                      />
+                    </BarChart>
                   </ResponsiveContainer>
                 </div>
               </div>
@@ -964,30 +1093,134 @@ export default function App() {
                     </select>
                   </div>
 
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5 relative">
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
                       <Building2 className="w-3 h-3" /> Ville
                     </label>
-                    <input 
-                      type="text"
-                      placeholder="Ex: Paris, Lyon..."
-                      value={geoFilter.city}
-                      onChange={(e) => setGeoFilter(prev => ({ ...prev, city: e.target.value }))}
-                      className="w-full text-sm font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
-                    />
+                    <div className="relative">
+                      <input 
+                        type="text"
+                        placeholder="Ex: Paris, Lyon..."
+                        value={geoFilter.city}
+                        onChange={(e) => {
+                          const newCity = e.target.value;
+                          setGeoFilter(prev => ({ 
+                            ...prev, 
+                            city: newCity,
+                            // Si on écrit une ville, on repasse en mode "France entière" pour ne pas être bridé par le rayon
+                            radius: newCity ? 1000 : prev.radius 
+                          }));
+                          setShowCitySuggestions(true);
+                        }}
+                        onFocus={() => setShowCitySuggestions(true)}
+                        className="w-full text-sm font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+                      />
+                      <button 
+                        onClick={() => setShowCitySuggestions(!showCitySuggestions)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      >
+                        <ChevronDown className={cn("w-4 h-4 transition-transform", showCitySuggestions && "rotate-180")} />
+                      </button>
+                    </div>
+                    
+                    {showCitySuggestions && (
+                      <>
+                        <div 
+                          className="fixed inset-0 z-10" 
+                          onClick={() => setShowCitySuggestions(false)} 
+                        />
+                        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-20 max-h-48 overflow-y-auto custom-scrollbar overflow-x-hidden">
+                          {filteredCities.length > 0 ? (
+                            filteredCities.map((city, idx) => (
+                              <button
+                                key={idx}
+                                onClick={() => {
+                                  setGeoFilter(prev => ({ 
+                                    ...prev, 
+                                    city,
+                                    radius: 1000 // France entière quand on choisit une ville
+                                  }));
+                                  setShowCitySuggestions(false);
+                                }}
+                                className="w-full text-left px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-primary transition-colors flex items-center gap-2"
+                              >
+                                <MapPin className="w-3 h-3 text-slate-300" />
+                                {city}
+                              </button>
+                            ))
+                          ) : (
+                            <div className="px-4 py-3 text-xs text-slate-400 italic">
+                              Aucune ville trouvée
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
                   </div>
 
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5 relative">
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
                       <MapPin className="w-3 h-3" /> Département
                     </label>
-                    <input 
-                      type="text"
-                      placeholder="Ex: 75, 69, 33..."
-                      value={geoFilter.department}
-                      onChange={(e) => setGeoFilter(prev => ({ ...prev, department: e.target.value }))}
-                      className="w-full text-sm font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
-                    />
+                    <div className="relative">
+                      <input 
+                        type="text"
+                        placeholder="Ex: 75, 69, 33..."
+                        value={geoFilter.department}
+                        onChange={(e) => {
+                          const newDept = e.target.value;
+                          setGeoFilter(prev => ({ 
+                            ...prev, 
+                            department: newDept,
+                            // Si on écrit un département, on repasse en mode "France entière"
+                            radius: newDept ? 1000 : prev.radius
+                          }));
+                          setShowDeptSuggestions(true);
+                        }}
+                        onFocus={() => setShowDeptSuggestions(true)}
+                        className="w-full text-sm font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+                      />
+                      <button 
+                        onClick={() => setShowDeptSuggestions(!showDeptSuggestions)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      >
+                        <ChevronDown className={cn("w-4 h-4 transition-transform", showDeptSuggestions && "rotate-180")} />
+                      </button>
+                    </div>
+                    
+                    {showDeptSuggestions && (
+                      <>
+                        <div 
+                          className="fixed inset-0 z-10" 
+                          onClick={() => setShowDeptSuggestions(false)} 
+                        />
+                        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-20 max-h-48 overflow-y-auto custom-scrollbar overflow-x-hidden">
+                          {filteredDepts.length > 0 ? (
+                            filteredDepts.map((dept, idx) => (
+                              <button
+                                key={idx}
+                                onClick={() => {
+                                  setGeoFilter(prev => ({ 
+                                    ...prev, 
+                                    department: dept,
+                                    radius: 1000 // France entière quand on choisit un département
+                                  }));
+                                  setShowDeptSuggestions(false);
+                                }}
+                                className="w-full text-left px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-primary transition-colors flex items-center gap-2"
+                              >
+                                <MapPin className="w-3 h-3 text-slate-300" />
+                                {dept}
+                              </button>
+                            ))
+                          ) : (
+                            <div className="px-4 py-3 text-xs text-slate-400 italic">
+                              Aucun département trouvé
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
                   </div>
 
                   <div className="space-y-1.5">
@@ -996,14 +1229,23 @@ export default function App() {
                     </label>
                     <select 
                       value={geoFilter.radius}
-                      onChange={(e) => setGeoFilter(prev => ({ ...prev, radius: Number(e.target.value) }))}
+                      onChange={(e) => {
+                        const newRadius = Number(e.target.value);
+                        setGeoFilter(prev => ({ 
+                          ...prev, 
+                          radius: newRadius,
+                          // Si on passe à un rayon spécifique (pas France entière), on vide ville et département
+                          city: newRadius < 1000 ? '' : prev.city,
+                          department: newRadius < 1000 ? '' : prev.department
+                        }));
+                      }}
                       className="w-full text-sm font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none appearance-none cursor-pointer"
                     >
-                      <option value={20}>20 km (Proximité)</option>
-                      <option value={100}>100 km (Régional)</option>
-                      <option value={250}>250 km (Grand Sud/Nord)</option>
-                      <option value={500}>500 km (National)</option>
-                      <option value={1000}>France entière</option>
+                      <option value={10}>10 km (Proximité immédiate)</option>
+                      <option value={30}>30 km (Zone urbaine)</option>
+                      <option value={100}>100 km (Rayon régional)</option>
+                      <option value={250}>250 km (Grand secteur)</option>
+                      <option value={1000}>France entière (Pas de limite)</option>
                     </select>
                   </div>
                 </div>
@@ -1045,29 +1287,45 @@ export default function App() {
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   />
-                  {mapFormations.map((f, idx) => (
-                    <Marker key={idx} position={f.position!}>
-                      <Popup>
-                        <div className="p-1">
-                          <h4 className="font-bold text-slate-900 text-sm mb-1">{f.etablissement}</h4>
-                          <p className="text-xs text-slate-500 mb-1">{f.filiere_formation}</p>
-                          <p className="text-xs font-medium text-primary-dark mb-1">{f.selectivite}</p>
-                          <p className="text-xs text-slate-500 mb-2">{f.commune} ({f.departement})</p>
-                          <div className="grid grid-cols-2 gap-2">
-                            <div className="bg-slate-50 p-2 rounded-lg">
-                              <span className="block text-[10px] text-slate-400 uppercase font-bold">Taux Accès</span>
-                              <span className="text-sm font-bold text-primary">{f.taux_acces}%</span>
+                  {groupedMapFormations.map((group, idx) => (
+                    <Marker key={idx} position={group[0].position}>
+                      <Popup minWidth={250} maxWidth={320}>
+                        <div className="max-h-[350px] overflow-y-auto pr-1 custom-scrollbar">
+                          {group.map((f, fIdx) => (
+                            <div key={fIdx} className={cn("p-1", fIdx > 0 && "mt-4 pt-4 border-t border-slate-200")}>
+                              {group.length > 1 && (
+                                <div className="flex items-center justify-between mb-2">
+                                  <span className="px-1.5 py-0.5 bg-primary-light text-primary text-[9px] font-bold rounded uppercase">
+                                    Formation {fIdx + 1}/{group.length}
+                                  </span>
+                                  <span className="text-[9px] text-slate-400 font-bold uppercase">ID: {f.etablissement.slice(0,3)}...</span>
+                                </div>
+                              )}
+                              <h4 className="font-bold text-slate-900 text-sm mb-1">{f.etablissement}</h4>
+                              <p className="text-xs text-slate-500 mb-1 leading-relaxed">{f.filiere_formation}</p>
+                              <p className="text-xs font-medium text-primary-dark mb-1">{f.selectivite}</p>
+                              <p className="text-xs text-slate-500 mb-2">{f.commune} ({f.departement})</p>
+                              
+                              <div className="grid grid-cols-2 gap-2">
+                                <div className="bg-slate-50 p-2 rounded-lg">
+                                  <span className="block text-[10px] text-slate-400 uppercase font-bold">Taux Accès</span>
+                                  <span className="text-sm font-bold text-primary">
+                                    {f.taux_acces !== null ? `${f.taux_acces}%` : "Inconnu"}
+                                  </span>
+                                </div>
+                                <div className="bg-slate-50 p-2 rounded-lg">
+                                  <span className="block text-[10px] text-slate-400 uppercase font-bold">Capacité</span>
+                                  <span className="text-sm font-bold text-slate-700">{f.capacite}</span>
+                                </div>
+                              </div>
+                              
+                              <div className="mt-2 pt-2 border-t border-slate-100">
+                                <span className="text-[10px] text-slate-400 font-medium italic leading-tight block">
+                                  Note moyenne au bac pour les admis: {f.note_moyenne.toFixed(2)}/20
+                                </span>
+                              </div>
                             </div>
-                            <div className="bg-slate-50 p-2 rounded-lg">
-                              <span className="block text-[10px] text-slate-400 uppercase font-bold">Capacité</span>
-                              <span className="text-sm font-bold text-slate-700">{f.capacite}</span>
-                            </div>
-                          </div>
-                          <div className="mt-2 pt-2 border-t border-slate-100">
-                            <span className="text-[10px] text-slate-400 font-medium italic">
-                              Note moyenne au bac pour les admis de cette formation: {f.note_moyenne.toFixed(2)}/20
-                            </span>
-                          </div>
+                          ))}
                         </div>
                       </Popup>
                     </Marker>
