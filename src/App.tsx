@@ -29,7 +29,7 @@ import {
   X,
   Building2,
   Navigation,
-  bell
+  Bell
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
