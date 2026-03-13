@@ -28,7 +28,8 @@ import {
   Target,
   X,
   Building2,
-  Navigation
+  Navigation,
+  bell
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -599,26 +600,88 @@ export default function App() {
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-primary-light selection:text-primary">
       {/* Header */}
       <header className="bg-primary sticky top-0 z-50 shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <svg viewBox="0 0 160 40" className="h-9 w-auto fill-white" xmlns="http://www.w3.org/2000/svg">
-              <text x="0" y="32" fontFamily="Arial, sans-serif" fontWeight="900" fontStyle="italic" fontSize="28" fill="white">l'Étudiant</text>
-            </svg>
-          </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
-          <div className="flex items-center gap-4">
-            <button 
-              onClick={() => setOnboardingComplete(false)}
-              className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl border border-white/20 transition-all text-sm font-bold shadow-sm"
-            >
-              <Users className="w-4 h-4" />
-              <span className="hidden sm:inline">Modifier mon profil</span>
-              <span className="sm:hidden">Profil</span>
-            </button>
+          {/* --- LIGNE HAUT : Logo et Actions --- */}
+          <div className="h-16 flex items-center justify-between">
+            {/* Logo */}
+            <div className="flex items-center gap-2">
+              <img 
+                src="/Logo.png" 
+                alt="Logo l'Étudiant" 
+                className="h-8 w-auto object-contain brightness-0 invert" 
+              />
+            </div>
+            
+            {/* Actions Droite */}
+            <div className="flex items-center gap-5">
+              <button className="text-white hover:text-white/80 transition-colors">
+                <Bell className="w-5 h-5 sm:w-6 sm:h-6" />
+              </button>
+              <button className="text-white hover:text-white/80 transition-colors">
+                <Search className="w-5 h-5 sm:w-6 sm:h-6" />
+              </button>
+
+              <div className="hidden sm:block w-px h-6 bg-white/30"></div> {/* Séparateur vertical */}
+
+              {/* Vos données onboarding (conservées) */}
+              {onboardingData && (
+                <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-white/20 rounded-full border border-white/30 backdrop-blur-sm">
+                  <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="text-xs font-bold text-white uppercase tracking-widest">
+                    {onboardingData.academy}
+                  </span>
+                </div>
+              )}
+              
+              {/* Votre bouton profil (adapté pour ressembler à un avatar/bouton d'action) */}
+              <button 
+                onClick={() => setOnboardingComplete(false)}
+                className="flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 bg-white/10 hover:bg-white/20 text-white rounded-full sm:rounded-xl border border-white/20 transition-all text-sm font-bold shadow-sm"
+              >
+                <Users className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="hidden sm:inline">Profil</span>
+              </button>
+            </div>
           </div>
+
+          {/* --- LIGNE BAS : Navigation --- */}
+          <nav className="flex items-center gap-6 pb-3 overflow-x-auto no-scrollbar">
+            <a href="#" className="text-white font-bold text-[14px] sm:text-[15px] hover:underline whitespace-nowrap">Salons</a>
+            
+            <button className="flex items-center gap-1 text-white font-bold text-[14px] sm:text-[15px] hover:underline whitespace-nowrap">
+              Orientation <ChevronDown className="w-4 h-4" />
+            </button>
+            
+            <button className="flex items-center gap-1 text-white font-bold text-[14px] sm:text-[15px] hover:underline whitespace-nowrap">
+              Révisions / Examens <ChevronDown className="w-4 h-4" />
+            </button>
+            
+            <button className="flex items-center gap-1 text-white font-bold text-[14px] sm:text-[15px] hover:underline whitespace-nowrap">
+              Métiers <ChevronDown className="w-4 h-4" />
+            </button>
+            
+            <button className="flex items-center gap-1 text-white font-bold text-[14px] sm:text-[15px] hover:underline whitespace-nowrap">
+              Vie étudiante <ChevronDown className="w-4 h-4" />
+            </button>
+            
+            <button className="flex items-center gap-1 text-white font-bold text-[14px] sm:text-[15px] hover:underline whitespace-nowrap">
+              Jobs, stages, alternance <ChevronDown className="w-4 h-4" />
+            </button>
+            
+            <a href="#" className="text-white font-bold text-[14px] sm:text-[15px] hover:underline whitespace-nowrap">EducPros</a>
+          </nav>
+        </div>
+
+        {/* --- LIGNE MULTICOLORE (Design signature l'Étudiant) --- */}
+        <div className="h-1 w-full flex">
+          <div className="h-full flex-1 bg-pink-500"></div>
+          <div className="h-full flex-1 bg-yellow-400"></div>
+          <div className="h-full flex-1 bg-green-500"></div>
+          <div className="h-full flex-1 bg-blue-500"></div>
+          <div className="h-full flex-1 bg-orange-500"></div>
         </div>
       </header>
-
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Hero / Selection */}
         <section className="mb-12 text-center max-w-3xl mx-auto">
