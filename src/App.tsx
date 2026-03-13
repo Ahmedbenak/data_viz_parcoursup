@@ -28,8 +28,7 @@ import {
   Target,
   X,
   Building2,
-  Navigation,
-  Bell,
+  Navigation
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -101,15 +100,6 @@ const mapSupabaseData = (rawData: any[]): OrientationData[] => {
 
 const COLORS = ['#e30613', '#f43f5e', '#ec4899', '#8b5cf6', '#6366f1', '#10b981', '#06b6d4'];
 
-const ACADEMIES = [
-  "Aix-Marseille", "Amiens", "Besançon", "Bordeaux", "Clermont-Ferrand", 
-  "Corse", "Créteil", "Dijon", "Grenoble", "Lille", "Limoges", "Lyon", 
-  "Montpellier", "Nancy-Metz", "Nantes", "Nice", "Normandie", 
-  "Orléans-Tours", "Paris", "Poitiers", "Reims", "Rennes", 
-  "Strasbourg", "Toulouse", "Versailles", "Guyane", "La Réunion", 
-  "Martinique", "Mayotte"
-];
-
 // Utility for distance calculation (Haversine formula)
 function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
   const R = 6371; // km
@@ -148,8 +138,6 @@ export default function App() {
   const [showSuggestions, setShowSuggestions] = useState(false);
 
   // Dashboard Filters
-  const [filterAcademy, setFilterAcademy] = useState<string>('');
-  const [filterMobility, setFilterMobility] = useState<boolean>(false);
   const [filterAverage, setFilterAverage] = useState<string>('');
   
   // Table Filters & Sorting
@@ -367,8 +355,6 @@ export default function App() {
       setSelectedSpecialty(data.specialty);
       setSearchQuery(data.specialty);
     }
-    setFilterAcademy(data.academy);
-    setFilterMobility(data.stayInAcademy);
     setFilterAverage(data.averageBac);
     setOnboardingComplete(true);
   };
@@ -414,14 +400,6 @@ export default function App() {
         };
       });
 
-    // Apply Academy Filter
-    if (filterAcademy) {
-      const hasAcademyColumn = baseData.some(d => d.academy);
-      if (hasAcademyColumn) {
-        baseData = baseData.filter(d => d.academy === filterAcademy);
-      }
-    }
-
     // Sort by the chosen metric for "Top 10"
     const sortedByMetric = [...baseData].sort((a, b) => b[tableFilterMetric] - a[tableFilterMetric]);
     const top10 = sortedByMetric.slice(0, 10);
@@ -442,7 +420,7 @@ export default function App() {
 
       return sortConfig.direction === 'asc' ? aNum - bNum : bNum - aNum;
     });
-  }, [filteredData, sortConfig, filterAcademy, tableFilterMetric]);
+  }, [filteredData, sortConfig, tableFilterMetric]);
 
   const mapFormations = useMemo(() => {
     // If no formation type is selected and no specific formations are picked, show nothing by default
@@ -594,86 +572,23 @@ export default function App() {
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-primary-light selection:text-primary">
       {/* Header */}
       <header className="bg-primary sticky top-0 z-50 shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          
-          {/* --- LIGNE HAUT : Logo et Actions --- */}
-          <div className="h-16 flex items-center justify-between">
-            {/* Logo */}
-            <div className="flex items-center gap-2">
-              <img 
-                src="/Logo.png" 
-                alt="Logo l'Étudiant" 
-                className="h-8 w-auto object-contain brightness-0 invert" 
-              />
-            </div>
-            
-            {/* Actions Droite */}
-            <div className="flex items-center gap-5">
-              <button className="text-white hover:text-white/80 transition-colors">
-                <Bell className="w-5 h-5 sm:w-6 sm:h-6" />
-              </button>
-              <button className="text-white hover:text-white/80 transition-colors">
-                <Search className="w-5 h-5 sm:w-6 sm:h-6" />
-              </button>
-
-              <div className="hidden sm:block w-px h-6 bg-white/30"></div> {/* Séparateur vertical */}
-
-              {/* Vos données onboarding (conservées) */}
-              {onboardingData && (
-                <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-white/20 rounded-full border border-white/30 backdrop-blur-sm">
-                  <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <span className="text-xs font-bold text-white uppercase tracking-widest">
-                    {onboardingData.academy}
-                  </span>
-                </div>
-              )}
-              
-              {/* Votre bouton profil (adapté pour ressembler à un avatar/bouton d'action) */}
-              <button 
-                onClick={() => setOnboardingComplete(false)}
-                className="flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 bg-white/10 hover:bg-white/20 text-white rounded-full sm:rounded-xl border border-white/20 transition-all text-sm font-bold shadow-sm"
-              >
-                <Users className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span className="hidden sm:inline">Profil</span>
-              </button>
-            </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <svg viewBox="0 0 160 40" className="h-9 w-auto fill-white" xmlns="http://www.w3.org/2000/svg">
+              <text x="0" y="32" fontFamily="Arial, sans-serif" fontWeight="900" fontStyle="italic" fontSize="28" fill="white">l'Étudiant</text>
+            </svg>
           </div>
-
-          {/* --- LIGNE BAS : Navigation --- */}
-          <nav className="flex items-center gap-6 pb-3 overflow-x-auto no-scrollbar">
-            <a href="#" className="text-white font-bold text-[14px] sm:text-[15px] hover:underline whitespace-nowrap">Salons</a>
-            
-            <button className="flex items-center gap-1 text-white font-bold text-[14px] sm:text-[15px] hover:underline whitespace-nowrap">
-              Orientation <ChevronDown className="w-4 h-4" />
+          
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => setOnboardingComplete(false)}
+              className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl border border-white/20 transition-all text-sm font-bold shadow-sm"
+            >
+              <Users className="w-4 h-4" />
+              <span className="hidden sm:inline">Modifier mon profil</span>
+              <span className="sm:hidden">Profil</span>
             </button>
-            
-            <button className="flex items-center gap-1 text-white font-bold text-[14px] sm:text-[15px] hover:underline whitespace-nowrap">
-              Révisions / Examens <ChevronDown className="w-4 h-4" />
-            </button>
-            
-            <button className="flex items-center gap-1 text-white font-bold text-[14px] sm:text-[15px] hover:underline whitespace-nowrap">
-              Métiers <ChevronDown className="w-4 h-4" />
-            </button>
-            
-            <button className="flex items-center gap-1 text-white font-bold text-[14px] sm:text-[15px] hover:underline whitespace-nowrap">
-              Vie étudiante <ChevronDown className="w-4 h-4" />
-            </button>
-            
-            <button className="flex items-center gap-1 text-white font-bold text-[14px] sm:text-[15px] hover:underline whitespace-nowrap">
-              Jobs, stages, alternance <ChevronDown className="w-4 h-4" />
-            </button>
-            
-            <a href="#" className="text-white font-bold text-[14px] sm:text-[15px] hover:underline whitespace-nowrap">EducPros</a>
-          </nav>
-        </div>
-
-        {/* --- LIGNE MULTICOLORE (Design signature l'Étudiant) --- */}
-        <div className="h-1 w-full flex">
-          <div className="h-full flex-1 bg-pink-500"></div>
-          <div className="h-full flex-1 bg-yellow-400"></div>
-          <div className="h-full flex-1 bg-green-500"></div>
-          <div className="h-full flex-1 bg-blue-500"></div>
-          <div className="h-full flex-1 bg-orange-500"></div>
+          </div>
         </div>
       </header>
 
@@ -746,23 +661,6 @@ export default function App() {
               <span className="text-xs font-bold uppercase tracking-widest">Filtres de ton profil</span>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-4">
-              <div className="flex items-center gap-3 px-4 py-2 bg-white rounded-2xl border border-slate-200 shadow-sm hover:border-primary/30 transition-all">
-                <div className="w-8 h-8 bg-primary-light rounded-lg flex items-center justify-center">
-                  <MapPin className="w-4 h-4 text-primary" />
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Académie</span>
-                  <select 
-                    value={filterAcademy}
-                    onChange={(e) => setFilterAcademy(e.target.value)}
-                    className="text-sm font-bold text-slate-700 bg-transparent border-none p-0 focus:ring-0 cursor-pointer min-w-[140px]"
-                  >
-                    <option value="">Toutes les académies</option>
-                    {ACADEMIES.map(a => <option key={a} value={a}>{a}</option>)}
-                  </select>
-                </div>
-              </div>
-
               <div className="flex items-center gap-3 px-4 py-2 bg-white rounded-2xl border border-slate-200 shadow-sm hover:border-emerald-200 transition-all">
                 <div className="w-8 h-8 bg-emerald-50 rounded-lg flex items-center justify-center">
                   <TrendingUp className="w-4 h-4 text-emerald-600" />
@@ -781,33 +679,10 @@ export default function App() {
                 </div>
               </div>
 
-              <button 
-                onClick={() => setFilterMobility(!filterMobility)}
-                className={cn(
-                  "flex items-center gap-3 px-4 py-2 rounded-2xl border transition-all shadow-sm group",
-                  filterMobility 
-                    ? "bg-primary border-primary text-white" 
-                    : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                )}
-              >
-                <div className={cn(
-                  "w-8 h-8 rounded-lg flex items-center justify-center transition-colors",
-                  filterMobility ? "bg-white/20" : "bg-slate-100 group-hover:bg-primary-light"
-                )}>
-                  <Target className={cn("w-4 h-4", filterMobility ? "text-white" : "text-slate-400 group-hover:text-primary")} />
-                </div>
-                <div className="flex flex-col items-start">
-                  <span className={cn("text-[10px] font-bold uppercase tracking-tight", filterMobility ? "text-white/70" : "text-slate-400")}>Mobilité</span>
-                  <span className="text-sm font-bold">{filterMobility ? "Ma zone" : "France entière"}</span>
-                </div>
-              </button>
-
-              {(filterAcademy !== onboardingData?.academy || filterAverage !== onboardingData?.averageBac || filterMobility !== onboardingData?.stayInAcademy) && (
+              {(filterAverage !== onboardingData?.averageBac) && (
                 <button 
                   onClick={() => {
-                    setFilterAcademy(onboardingData?.academy || '');
                     setFilterAverage(onboardingData?.averageBac || '');
-                    setFilterMobility(onboardingData?.stayInAcademy || false);
                   }}
                   className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-slate-400 hover:text-primary transition-all hover:bg-primary-light rounded-xl"
                 >
