@@ -70,7 +70,22 @@ export default function OnboardingQuestionnaire({ onComplete, specialties, loadi
     );
   }, [data.specialty1, data.specialty2, specialties]);
 
+  const handleAverageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(',', '.');
+    if (value === '' || /^\d*\.?\d*$/.test(value)) {
+      setData({ ...data, averageBac: value });
+    }
+  };
+
+  const isAverageValid = React.useMemo(() => {
+    if (!data.averageBac) return false;
+    const val = parseFloat(data.averageBac);
+    return !isNaN(val) && val >= 10 && val <= 20;
+  }, [data.averageBac]);
+
   const handleComplete = () => {
+    if (!isAverageValid) return;
+    
     // Find the actual string in the database that contains both
     const actualSpecialty = specialties.find(s => 
       s.includes(data.specialty1) && s.includes(data.specialty2)
@@ -83,13 +98,6 @@ export default function OnboardingQuestionnaire({ onComplete, specialties, loadi
       ...data,
       specialty: actualSpecialty
     });
-  };
-
-  const handleAverageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(',', '.');
-    if (value === '' || /^\d*\.?\d*$/.test(value)) {
-      setData({ ...data, averageBac: value });
-    }
   };
 
   return (
@@ -190,9 +198,12 @@ export default function OnboardingQuestionnaire({ onComplete, specialties, loadi
             {/* Bottom Section: Average & Action */}
             <div className="pt-6 border-t border-slate-100 flex flex-col md:flex-row items-center justify-between gap-6">
               <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-6 bg-slate-50 px-6 py-3 rounded-2xl border border-slate-100">
+                <label className="flex items-center gap-2 text-xs font-black text-slate-400 uppercase tracking-widest mb-1">
+                  <div className="w-5 h-5 rounded-full bg-primary text-white flex items-center justify-center text-[10px]">3</div>
+                  Ta moyenne attendue au bac
+                </label>
+                <div className="flex items-center gap-6 bg-slate-50 px-6 py-3 rounded-2xl border border-slate-100 relative">
                   <div className="flex flex-col">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Moyenne Bac</span>
                     <div className="flex items-center gap-2">
                       <input 
                         type="text"
@@ -200,17 +211,26 @@ export default function OnboardingQuestionnaire({ onComplete, specialties, loadi
                         placeholder="14.5"
                         value={data.averageBac}
                         onChange={handleAverageChange}
-                        className="w-20 bg-transparent border-none p-0 focus:ring-0 text-2xl font-black text-primary placeholder:text-slate-300"
+                        className={cn(
+                          "w-20 bg-transparent border-none p-0 focus:ring-0 text-2xl font-black transition-colors",
+                          data.averageBac && !isAverageValid ? "text-rose-500" : "text-primary placeholder:text-slate-300"
+                        )}
                       />
                       <span className="text-slate-300 font-black text-lg">/ 20</span>
                     </div>
                   </div>
                   <div className="w-px h-10 bg-slate-200" />
                   <div className="hidden sm:block">
-                    <p className="text-[10px] text-slate-400 font-bold leading-tight max-w-[120px]">
-                      Utilisée pour estimer tes chances réelles.
+                    <p className="text-[10px] text-slate-400 font-bold leading-tight max-w-[150px]">
+                      Utilisée pour trouver les formations qui te correspondent le mieux.
                     </p>
                   </div>
+                  
+                  {data.averageBac && !isAverageValid && (
+                    <div className="absolute -bottom-6 left-0 flex items-center gap-1 text-rose-500 text-[9px] font-black uppercase tracking-wider animate-in fade-in slide-in-from-top-1">
+                      <span>La moyenne doit être entre 10 et 20</span>
+                    </div>
+                  )}
                 </div>
                 
                 {data.specialty1 && data.specialty2 && !isValidCombination && (
@@ -222,7 +242,7 @@ export default function OnboardingQuestionnaire({ onComplete, specialties, loadi
 
               <button 
                 onClick={handleComplete}
-                disabled={!isValidCombination || !data.averageBac}
+                disabled={!isValidCombination || !isAverageValid}
                 className="w-full md:w-auto bg-primary text-white px-12 py-5 rounded-2xl font-black text-lg hover:bg-primary-hover transition-all flex items-center justify-center gap-3 shadow-xl shadow-primary-light active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:grayscale"
               >
                 Analyser mon profil <ChevronRight className="w-5 h-5" />
