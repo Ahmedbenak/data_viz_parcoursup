@@ -60,6 +60,7 @@ interface Parcoursup2Data {
   region: string;
   coordonnees_gps: string;
   eff_admis: number;
+  eff_admis_neo?: number;
   capacite: number;
   taux_acces: number | null;
   note_moyenne: number | null;
@@ -69,6 +70,8 @@ interface Parcoursup2Data {
   pct_admis_neo_pro: number;
   lien_parcoursup?: string;
   pct_boursiers?: number;
+  pct_admis_neo_boursiers?: number;
+  eff_admis_boursiers_neo?: number;
   pct_admises_filles?: number;
   pct_admis_neo_sans_mention?: number;
   pct_admis_neo_mention_ab?: number;
@@ -153,7 +156,11 @@ export default function StatsPanel({ data, userNote, selectedDepartment, allData
       neoGen: avg(validData.map(d => d.pct_admis_neo_gen)),
       neoTechno: avg(validData.map(d => d.pct_admis_neo_techno)),
       neoPro: avg(validData.map(d => d.pct_admis_neo_pro)),
-      boursiers: avg(validData.map(d => d.pct_boursiers || 0)),
+      boursiers: (() => {
+        const totalBoursiers = allDataOfSameType.reduce((sum, d) => sum + (d.eff_admis_boursiers_neo || 0), 0);
+        const totalAdmis = allDataOfSameType.reduce((sum, d) => sum + (d.eff_admis_neo || 0), 0);
+        return totalAdmis > 0 ? (totalBoursiers / totalAdmis) * 100 : 0;
+      })(),
       femmes: avg(validData.map(d => d.pct_admises_filles || 0)),
       mentions: {
         sans: avg(validData.map(d => d.pct_admis_neo_sans_mention || 0)),
@@ -352,40 +359,114 @@ export default function StatsPanel({ data, userNote, selectedDepartment, allData
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Accessibility Section (Left) */}
         <div className="bg-white p-8 md:p-10 rounded-[3.5rem] border border-slate-100 shadow-sm">
-          <div className="flex items-center gap-3 mb-8">
-            <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center">
-              <BarChart3 className="w-6 h-6 text-emerald-600" />
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center">
+                <Target className="w-6 h-6 text-emerald-600" />
+              </div>
+              <h4 className="text-2xl font-black text-slate-900 tracking-tight">Ton Potentiel d'Admission</h4>
             </div>
-            <h4 className="text-2xl font-black text-slate-900 tracking-tight">Accessibilité</h4>
+            <div className="px-4 py-2 bg-slate-50 rounded-xl border border-slate-100">
+              <span className="text-[10px] font-black text-slate-400 uppercase block leading-none mb-1">Ta Note</span>
+              <span className="text-lg font-black text-primary">{localUserNote.toFixed(1)}/20</span>
+            </div>
           </div>
           
-          <div className="space-y-8">
-            <div className="h-[300px] flex items-center justify-center bg-slate-50/50 rounded-[2.5rem] p-6">
-              <Bar 
-                data={accessibilityChartData} 
-                options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  plugins: { legend: { display: false } },
-                  scales: { 
-                    y: { beginAtZero: true, ticks: { font: { weight: 'bold' } }, grid: { display: false } },
-                    x: { grid: { display: false }, ticks: { font: { weight: 'bold' } } }
-                  }
-                }} 
-              />
+          <div className="space-y-6">
+            {/* Visual Distribution Bar */}
+            <div className="relative pt-2 pb-6">
+              <div className="flex h-4 w-full rounded-full bg-slate-100 overflow-hidden shadow-inner">
+                <div 
+                  className="h-full bg-emerald-500 transition-all duration-1000" 
+                  style={{ width: `${(segments.accessible.count / overview.count) * 100}%` }}
+                />
+                <div 
+                  className="h-full bg-amber-400 transition-all duration-1000" 
+                  style={{ width: `${(segments.level.count / overview.count) * 100}%` }}
+                />
+                <div 
+                  className="h-full bg-rose-500 transition-all duration-1000" 
+                  style={{ width: `${(segments.ambitious.count / overview.count) * 100}%` }}
+                />
+              </div>
+              <div className="flex justify-between mt-2 px-1">
+                <span className="text-[9px] font-black text-emerald-600 uppercase">Sécure</span>
+                <span className="text-[9px] font-black text-amber-600 uppercase">Réaliste</span>
+                <span className="text-[9px] font-black text-rose-600 uppercase">Ambitieux</span>
+              </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            {/* Detailed Cards */}
+            <div className="grid grid-cols-1 gap-4">
               {[
-                { label: 'Accessibles', color: 'emerald', indicator: '🟢 Facile' },
-                { label: 'Niveau', color: 'amber', indicator: '🟡 Moyen' },
-                { label: 'Ambitieuses', color: 'rose', indicator: '🔴 Difficile' }
+                { 
+                  label: 'Sécure', 
+                  count: segments.accessible.count, 
+                  color: 'emerald', 
+                  icon: CheckCircle2,
+                  desc: "Ta note est supérieure à la moyenne des admis.",
+                  advice: "C'est ton filet de sécurité."
+                },
+                { 
+                  label: 'Réaliste', 
+                  count: segments.level.count, 
+                  color: 'amber', 
+                  icon: Info,
+                  desc: "Ta note correspond exactement au profil type.",
+                  advice: "Tes chances sont très sérieuses."
+                },
+                { 
+                  label: 'Ambitieux', 
+                  count: segments.ambitious.count, 
+                  color: 'rose', 
+                  icon: AlertTriangle,
+                  desc: "Ta note est un peu juste par rapport aux admis.",
+                  advice: "Nécessite un dossier exceptionnel."
+                }
               ].map((seg, i) => (
-                <div key={i} className="text-center">
-                  <div className={`text-[10px] font-black text-${seg.color}-600 uppercase mb-1`}>{seg.indicator}</div>
-                  <div className="text-[9px] text-slate-400 font-bold leading-tight">{seg.label}</div>
+                <div key={i} className={cn(
+                  "p-5 rounded-3xl border transition-all hover:shadow-md flex items-center gap-5",
+                  seg.color === 'emerald' ? "bg-emerald-50/30 border-emerald-100" :
+                  seg.color === 'amber' ? "bg-amber-50/30 border-amber-100" :
+                  "bg-rose-50/30 border-rose-100"
+                )}>
+                  <div className={cn(
+                    "w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-sm",
+                    seg.color === 'emerald' ? "bg-emerald-500 text-white" :
+                    seg.color === 'amber' ? "bg-amber-400 text-white" :
+                    "bg-rose-500 text-white"
+                  )}>
+                    <seg.icon className="w-6 h-6" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className={cn("text-xs font-black uppercase tracking-wider", `text-${seg.color}-600`)}>
+                        {seg.label}
+                      </span>
+                      <span className="text-lg font-black text-slate-900">
+                        {seg.count} <span className="text-[10px] text-slate-400 uppercase font-bold">formations</span>
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-600 font-medium leading-tight">
+                      {seg.desc} <span className="text-slate-400 italic">{seg.advice}</span>
+                    </p>
+                  </div>
                 </div>
               ))}
+            </div>
+
+            {/* Final Advice */}
+            <div className="mt-6 p-5 bg-slate-900 rounded-[2rem] text-white flex items-start gap-4">
+              <div className="p-2 bg-white/10 rounded-xl">
+                <Lightbulb className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-xs font-bold leading-relaxed">
+                  {segments.accessible.count > 0 
+                    ? `Tu as ${segments.accessible.count} formations "Sécure". C'est excellent pour garantir ton admission !`
+                    : "Attention, tu n'as aucune formation 'Sécure'. Pense à élargir tes vœux pour plus de sécurité."}
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -423,7 +504,9 @@ export default function StatsPanel({ data, userNote, selectedDepartment, allData
               ].map((item, i) => (
                 <React.Fragment key={i}>
                   <div className={cn("text-center text-[10px] font-black text-slate-400 uppercase tracking-widest mt-2", selectedDepartment ? "col-span-2" : "col-span-1")}>{item.label}</div>
-                  <div className="text-xl font-black text-slate-400 text-center">{item.isNote ? item.nat.toFixed(1) : item.nat}{item.isPct ? '%' : ''}</div>
+                  <div className={cn("text-xl font-black text-center", selectedDepartment ? "text-slate-400" : "text-slate-900")}>
+                    {item.isNote ? item.nat.toFixed(1) : item.nat}{item.isPct ? '%' : ''}
+                  </div>
                   {selectedDepartment && (
                     <div className="text-xl font-black text-primary text-center">{item.isNote ? item.val.toFixed(1) : item.val}{item.isPct ? '%' : ''}</div>
                   )}
@@ -432,8 +515,8 @@ export default function StatsPanel({ data, userNote, selectedDepartment, allData
             </div>
 
             {!selectedDepartment && (
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 text-center">
-                <p className="text-[10px] text-slate-400 font-bold uppercase">Sélectionnez un département pour comparer</p>
+              <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100 text-center">
+                <p className="text-sm text-slate-500 font-bold uppercase tracking-wide">Sélectionnez un département pour comparer</p>
               </div>
             )}
           </div>

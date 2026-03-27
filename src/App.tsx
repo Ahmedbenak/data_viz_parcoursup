@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { getSupabase } from './lib/supabase';
 import { 
   BarChart, 
@@ -28,8 +28,7 @@ import {
   Target,
   X,
   Building2,
-  Navigation,
-  Bell
+  Navigation
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -51,6 +50,25 @@ import {
 } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+
+const createMarkerIcon = (colors: string[]) => {
+  if (colors.length === 1) {
+    return L.divIcon({
+      className: 'custom-marker',
+      html: `<div style="background-color: ${colors[0]}; width: 14px; height: 14px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>`,
+      iconSize: [14, 14],
+      iconAnchor: [7, 7]
+    });
+  } else {
+    const gradient = `conic-gradient(${colors.map((c, i) => `${c} ${i * (360/colors.length)}deg ${(i+1) * (360/colors.length)}deg`).join(', ')})`;
+    return L.divIcon({
+      className: 'custom-marker',
+      html: `<div style="background: ${gradient}; width: 18px; height: 18px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>`,
+      iconSize: [18, 18],
+      iconAnchor: [9, 9]
+    });
+  }
+};
 
 // Fix Leaflet marker icons
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
@@ -81,6 +99,7 @@ interface Parcoursup2Data {
   region: string;
   coordonnees_gps: string;
   eff_admis: number;
+  eff_admis_neo?: number;
   capacite: number;
   taux_acces: number | null;
   note_moyenne: number | null;
@@ -90,6 +109,8 @@ interface Parcoursup2Data {
   pct_admis_neo_pro: number;
   lien_parcoursup?: string;
   pct_boursiers?: number;
+  pct_admis_neo_boursiers?: number;
+  eff_admis_boursiers_neo?: number;
   pct_admises_filles?: number;
   pct_admis_neo_sans_mention?: number;
   pct_admis_neo_mention_ab?: number;
@@ -158,14 +179,31 @@ export default function App() {
   });
 
   // Map & Geo Filters
-  const [selectedForMap, setSelectedForMap] = useState<string[]>([]);
   const [geoFilter, setGeoFilter] = useState({
     city: '',
     department: '',
-    formationType: '',
+    formationTypes: [] as string[],
     radius: 1000, // km (France entière par défaut)
     center: [46.603354, 1.888334] as [number, number] // France center
   });
+
+  const [showFormationSuggestions, setShowFormationSuggestions] = useState(false);
+
+  // Dynamic Color Mapping based on all loaded formation types
+  const typeColorMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    allFormationTypes.forEach((type, index) => {
+      // Spread colors evenly across the hue spectrum (360 degrees)
+      const hue = (index * 360) / Math.max(1, allFormationTypes.length);
+      // Use consistent saturation and lightness for a professional look
+      map[type] = `hsl(${hue}, 75%, 45%)`;
+    });
+    return map;
+  }, [allFormationTypes]);
+
+  const getFormationColor = useCallback((type: string) => {
+    return typeColorMap[type] || '#64748b';
+  }, [typeColorMap]);
 
   const [allCities, setAllCities] = useState<string[]>([]);
   const [showCitySuggestions, setShowCitySuggestions] = useState(false);
@@ -257,23 +295,43 @@ export default function App() {
     loadInitialData();
   }, []);
 
-  // Step 2: Load map specific data when formation type changes
+  // Step 2: Load map specific data when formation types change
   useEffect(() => {
     const loadMapData = async () => {
-      if (!geoFilter.formationType) {
+      if (geoFilter.formationTypes.length === 0) {
         setMapSpecificData([]);
         return;
       }
       
       try {
         const supabase = getSupabase();
-        const { data: p2Data, error: p2Error } = await supabase
-          .from('parcoursup_2')
-          .select('*')
-          .eq('filiere_generale', geoFilter.formationType);
+        let allP2Data: any[] = [];
+        let from = 0;
+        const PAGE_SIZE = 1000;
+        let hasMore = true;
+
+        while (hasMore) {
+          const { data, error } = await supabase
+            .from('parcoursup_2')
+            .select('*')
+            .in('filiere_generale', geoFilter.formationTypes)
+            .range(from, from + PAGE_SIZE - 1);
           
-        if (!p2Error && p2Data) {
-            setMapSpecificData(p2Data.map(row => ({
+          if (error) throw error;
+          if (data && data.length > 0) {
+            allP2Data = [...allP2Data, ...data];
+            if (data.length < PAGE_SIZE) {
+              hasMore = false;
+            } else {
+              from += PAGE_SIZE;
+            }
+          } else {
+            hasMore = false;
+          }
+        }
+
+        if (allP2Data.length > 0) {
+            setMapSpecificData(allP2Data.map(row => ({
               filiere_generale: row.filiere_generale || "",
               filiere_formation: row.filiere_formation || "",
               etablissement: row.etablissement || "",
@@ -282,6 +340,7 @@ export default function App() {
               region: row.region || "",
               coordonnees_gps: row.coordonnees_gps || "",
               eff_admis: Number(row.eff_admis || 0),
+              eff_admis_neo: Number(row.eff_admis_neo || 0),
               capacite: Number(row.capacite || 0),
               taux_acces: (row.taux_acces === "nd" || row.taux_acces === null || row.taux_acces === "") ? null : parseFloat(row.taux_acces),
               note_moyenne: (row.note_moyenne === null || row.note_moyenne === "" || isNaN(Number(row.note_moyenne))) ? null : Number(row.note_moyenne),
@@ -291,6 +350,8 @@ export default function App() {
               pct_admis_neo_pro: Number(row["pct_admis_neo_pro"] || 0),
               lien_parcoursup: row.lien_parcoursup || "",
               pct_boursiers: Number(row.pct_boursiers || 0),
+              pct_admis_neo_boursiers: Number(row.pct_admis_neo_boursiers || 0),
+              eff_admis_boursiers_neo: Number(row.eff_admis_boursiers_neo || 0),
               pct_admises_filles: Number(row.pct_admises_filles || 0),
               pct_admis_neo_sans_mention: Number(row.pct_admis_neo_sans_mention || 0),
               pct_admis_neo_mention_ab: Number(row.pct_admis_neo_mention_ab || 0),
@@ -316,28 +377,65 @@ export default function App() {
         const supabase = getSupabase();
         
         // Fetch from parcoursup_1
-        const { data: orientationData, error: fetchError } = await supabase
-          .from('parcoursup_1')
-          .select('*')
-          .eq('specialites', selectedSpecialty);
+        let allOrientationData: any[] = [];
+        let from = 0;
+        const PAGE_SIZE = 1000;
+        let hasMore = true;
 
-        if (fetchError) throw fetchError;
+        while (hasMore) {
+          const { data, error } = await supabase
+            .from('parcoursup_1')
+            .select('*')
+            .eq('specialites', selectedSpecialty)
+            .range(from, from + PAGE_SIZE - 1);
+          
+          if (error) throw error;
+          if (data && data.length > 0) {
+            allOrientationData = [...allOrientationData, ...data];
+            if (data.length < PAGE_SIZE) {
+              hasMore = false;
+            } else {
+              from += PAGE_SIZE;
+            }
+          } else {
+            hasMore = false;
+          }
+        }
 
-          if (orientationData && orientationData.length > 0) {
-            const mappedData = mapSupabaseData(orientationData);
+        if (allOrientationData.length > 0) {
+            const mappedData = mapSupabaseData(allOrientationData);
             setData(mappedData);
             
             // Get the list of formations to filter parcoursup_2
-            const formationsList = orientationData.map(row => row.formation).filter(Boolean);
+            const formationsList = allOrientationData.map(row => row.formation).filter(Boolean);
             
             // Fetch from parcoursup_2 where filiere_generale matches any of the formations
-            const { data: p2Data, error: p2Error } = await supabase
-              .from('parcoursup_2')
-              .select('*')
-              .in('filiere_generale', formationsList);
+            let allP2Data: any[] = [];
+            let p2From = 0;
+            let p2HasMore = true;
+
+            while (p2HasMore) {
+              const { data: p2Data, error: p2Error } = await supabase
+                .from('parcoursup_2')
+                .select('*')
+                .in('filiere_generale', formationsList)
+                .range(p2From, p2From + PAGE_SIZE - 1);
+              
+              if (p2Error) throw p2Error;
+              if (p2Data && p2Data.length > 0) {
+                allP2Data = [...allP2Data, ...p2Data];
+                if (p2Data.length < PAGE_SIZE) {
+                  p2HasMore = false;
+                } else {
+                  p2From += PAGE_SIZE;
+                }
+              } else {
+                p2HasMore = false;
+              }
+            }
             
-            if (!p2Error && p2Data) {
-            setDetailedData(p2Data.map(row => ({
+            if (allP2Data.length > 0) {
+            setDetailedData(allP2Data.map(row => ({
               filiere_generale: row.filiere_generale || "",
               filiere_formation: row.filiere_formation || "",
               etablissement: row.etablissement || "",
@@ -346,6 +444,7 @@ export default function App() {
               region: row.region || "",
               coordonnees_gps: row.coordonnees_gps || "",
               eff_admis: Number(row.eff_admis || 0),
+              eff_admis_neo: Number(row.eff_admis_neo || 0),
               capacite: Number(row.capacite || 0),
               taux_acces: (row.taux_acces === "nd" || row.taux_acces === null || row.taux_acces === "") ? null : parseFloat(row.taux_acces),
               note_moyenne: (row.note_moyenne === null || row.note_moyenne === "" || isNaN(Number(row.note_moyenne))) ? null : Number(row.note_moyenne),
@@ -355,6 +454,8 @@ export default function App() {
               pct_admis_neo_pro: Number(row["pct_admis_neo_pro"] || 0),
               lien_parcoursup: row.lien_parcoursup || "",
               pct_boursiers: Number(row.pct_boursiers || 0),
+              pct_admis_neo_boursiers: Number(row.pct_admis_neo_boursiers || 0),
+              eff_admis_boursiers_neo: Number(row.eff_admis_boursiers_neo || 0),
               pct_admises_filles: Number(row.pct_admises_filles || 0),
               pct_admis_neo_sans_mention: Number(row.pct_admis_neo_sans_mention || 0),
               pct_admis_neo_mention_ab: Number(row.pct_admis_neo_mention_ab || 0),
@@ -451,8 +552,8 @@ export default function App() {
   }, [baseFormations, sortConfig, tableFilterMetric]);
 
   const mapFormations = useMemo(() => {
-    // If no formation type is selected and no specific formations are picked, show nothing by default
-    if (!geoFilter.formationType && selectedForMap.length === 0) {
+    // If no formation types are selected, show nothing by default
+    if (geoFilter.formationTypes.length === 0) {
       return [];
     }
 
@@ -470,9 +571,9 @@ export default function App() {
 
     let base = Array.from(combinedMap.values());
 
-    // Filter by Formation Type
-    if (geoFilter.formationType) {
-      base = base.filter(f => f.filiere_generale === geoFilter.formationType);
+    // Filter by Formation Types
+    if (geoFilter.formationTypes.length > 0) {
+      base = base.filter(f => geoFilter.formationTypes.includes(f.filiere_generale));
     }
 
     // Filter by City
@@ -486,11 +587,6 @@ export default function App() {
         f.departement.toLowerCase().includes(geoFilter.department.toLowerCase()) ||
         (f.departement.match(/\(([^)]+)\)/)?.[1] || "").includes(geoFilter.department)
       );
-    }
-
-    // Filter by selected for map
-    if (selectedForMap.length > 0) {
-      base = base.filter(f => selectedForMap.includes(f.etablissement + ' - ' + f.commune));
     }
 
     const mapped = base.map(f => {
@@ -510,7 +606,7 @@ export default function App() {
     }
 
     return mapped;
-  }, [detailedData, mapSpecificData, geoFilter, selectedForMap]);
+  }, [detailedData, mapSpecificData, geoFilter]);
 
   const groupedMapFormations = useMemo(() => {
     const groups = new Map<string, (Parcoursup2Data & { position: [number, number] })[]>();
@@ -523,8 +619,16 @@ export default function App() {
       groups.get(key)!.push(f as any);
     });
     
-    return Array.from(groups.values());
-  }, [mapFormations]);
+    return Array.from(groups.values()).map(group => {
+      const types = Array.from(new Set(group.map(f => f.filiere_generale)));
+      return {
+        formations: group,
+        types,
+        position: group[0].position,
+        colors: types.map(t => getFormationColor(t))
+      };
+    });
+  }, [mapFormations, getFormationColor]);
 
   const formationTypes = useMemo(() => {
     return allFormationTypes;
@@ -600,88 +704,26 @@ export default function App() {
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-primary-light selection:text-primary">
       {/* Header */}
       <header className="bg-primary sticky top-0 z-50 shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          
-          {/* --- LIGNE HAUT : Logo et Actions --- */}
-          <div className="h-16 flex items-center justify-between">
-            {/* Logo */}
-            <div className="flex items-center gap-2">
-              <img 
-                src="/Logo.png" 
-                alt="Logo l'Étudiant" 
-                className="h-8 w-auto object-contain brightness-0 invert" 
-              />
-            </div>
-            
-            {/* Actions Droite */}
-            <div className="flex items-center gap-5">
-              <button className="text-white hover:text-white/80 transition-colors">
-                <Bell className="w-5 h-5 sm:w-6 sm:h-6" />
-              </button>
-              <button className="text-white hover:text-white/80 transition-colors">
-                <Search className="w-5 h-5 sm:w-6 sm:h-6" />
-              </button>
-
-              <div className="hidden sm:block w-px h-6 bg-white/30"></div> {/* Séparateur vertical */}
-
-              {/* Vos données onboarding (conservées) */}
-              {onboardingData && (
-                <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-white/20 rounded-full border border-white/30 backdrop-blur-sm">
-                  <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <span className="text-xs font-bold text-white uppercase tracking-widest">
-                    {onboardingData.academy}
-                  </span>
-                </div>
-              )}
-              
-              {/* Votre bouton profil (adapté pour ressembler à un avatar/bouton d'action) */}
-              <button 
-                onClick={() => setOnboardingComplete(false)}
-                className="flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 bg-white/10 hover:bg-white/20 text-white rounded-full sm:rounded-xl border border-white/20 transition-all text-sm font-bold shadow-sm"
-              >
-                <Users className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span className="hidden sm:inline">Profil</span>
-              </button>
-            </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <svg viewBox="0 0 160 40" className="h-9 w-auto fill-white" xmlns="http://www.w3.org/2000/svg">
+              <text x="0" y="32" fontFamily="Arial, sans-serif" fontWeight="900" fontStyle="italic" fontSize="28" fill="white">l'Étudiant</text>
+            </svg>
           </div>
-
-          {/* --- LIGNE BAS : Navigation --- */}
-          <nav className="flex items-center gap-6 pb-3 overflow-x-auto no-scrollbar">
-            <a href="#" className="text-white font-bold text-[14px] sm:text-[15px] hover:underline whitespace-nowrap">Salons</a>
-            
-            <button className="flex items-center gap-1 text-white font-bold text-[14px] sm:text-[15px] hover:underline whitespace-nowrap">
-              Orientation <ChevronDown className="w-4 h-4" />
+          
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => setOnboardingComplete(false)}
+              className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl border border-white/20 transition-all text-sm font-bold shadow-sm"
+            >
+              <Users className="w-4 h-4" />
+              <span className="hidden sm:inline">Modifier mon profil</span>
+              <span className="sm:hidden">Profil</span>
             </button>
-            
-            <button className="flex items-center gap-1 text-white font-bold text-[14px] sm:text-[15px] hover:underline whitespace-nowrap">
-              Révisions / Examens <ChevronDown className="w-4 h-4" />
-            </button>
-            
-            <button className="flex items-center gap-1 text-white font-bold text-[14px] sm:text-[15px] hover:underline whitespace-nowrap">
-              Métiers <ChevronDown className="w-4 h-4" />
-            </button>
-            
-            <button className="flex items-center gap-1 text-white font-bold text-[14px] sm:text-[15px] hover:underline whitespace-nowrap">
-              Vie étudiante <ChevronDown className="w-4 h-4" />
-            </button>
-            
-            <button className="flex items-center gap-1 text-white font-bold text-[14px] sm:text-[15px] hover:underline whitespace-nowrap">
-              Jobs, stages, alternance <ChevronDown className="w-4 h-4" />
-            </button>
-            
-            <a href="#" className="text-white font-bold text-[14px] sm:text-[15px] hover:underline whitespace-nowrap">EducPros</a>
-          </nav>
-        </div>
-
-        {/* --- LIGNE MULTICOLORE (Design signature l'Étudiant) --- */}
-        <div className="h-1 w-full flex">
-          <div className="h-full flex-1 bg-pink-500"></div>
-          <div className="h-full flex-1 bg-yellow-400"></div>
-          <div className="h-full flex-1 bg-green-500"></div>
-          <div className="h-full flex-1 bg-blue-500"></div>
-          <div className="h-full flex-1 bg-orange-500"></div>
+          </div>
         </div>
       </header>
+
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Hero / Selection */}
         <section className="mb-12 text-center max-w-3xl mx-auto">
@@ -797,24 +839,24 @@ export default function App() {
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <StatCard 
-                title="Candidats Totaux" 
+                title="Total du nombre de vœux confirmés pour ce profil" 
                 value={globalStats ? globalStats.voeux.toLocaleString() : '0'} 
                 icon={<Users className="w-6 h-6 text-blue-600" />}
-                description="Nombre de vœux confirmés pour ce profil"
+                description=""
                 color="blue"
               />
               <StatCard 
-                title="Admissions" 
+                title="Total des propositions d'admission reçues pour ce profil" 
                 value={globalStats ? globalStats.admissions.toLocaleString() : '0'} 
                 icon={<CheckCircle className="w-6 h-6 text-emerald-600" />}
-                description="Nombre total de propositions reçues"
+                description=""
                 color="emerald"
               />
               <StatCard 
-                title="Taux d'Accès Global" 
+                title="Accessibilité des formations" 
                 value={globalStats ? `${globalStats.taux}%` : '0%'} 
                 icon={<TrendingUp className="w-6 h-6 text-primary" />}
-                description="Chance moyenne d'obtenir une proposition"
+                description="En moyenne, voici la probabilité qu'un seul de tes vœux soit accepté. N'oublie pas : plus tu fais de vœux, plus tu augmentes tes chances d'être pris quelque part !"
                 color="primary"
               />
             </div>
@@ -932,7 +974,6 @@ export default function App() {
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-50/50">
-                      <th className="px-6 py-4 w-10"></th>
                       <th 
                         className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors group/header"
                         onClick={() => handleSort('name')}
@@ -985,32 +1026,8 @@ export default function App() {
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {formationsData.map((item, idx) => {
-                      const matches = detailedData.filter(d => d.filiere_generale === item.name);
-                      const isSelected = matches.length > 0 && matches.every(m => selectedForMap.includes(m.etablissement + ' - ' + m.commune));
-                      const isSomeSelected = matches.length > 0 && matches.some(m => selectedForMap.includes(m.etablissement + ' - ' + m.commune));
-
                       return (
-                        <tr key={idx} className={cn("hover:bg-slate-50/50 transition-colors group", isSomeSelected && "bg-primary-light/30")}>
-                          <td className="px-6 py-4">
-                            <input 
-                              type="checkbox"
-                              checked={isSelected}
-                              ref={el => {
-                                if (el) el.indeterminate = isSomeSelected && !isSelected;
-                              }}
-                              onChange={(e) => {
-                                if (matches.length > 0) {
-                                  const ids = matches.map(m => m.etablissement + ' - ' + m.commune);
-                                  setSelectedForMap(prev => 
-                                    e.target.checked 
-                                      ? Array.from(new Set([...prev, ...ids])) 
-                                      : prev.filter(p => !ids.includes(p))
-                                  );
-                                }
-                              }}
-                              className="w-4 h-4 text-primary border-slate-300 rounded focus:ring-primary"
-                            />
-                          </td>
+                        <tr key={idx} className="hover:bg-slate-50/50 transition-colors group">
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-3">
                               <div className="w-8 h-8 rounded-lg bg-primary-light flex items-center justify-center text-primary font-bold text-xs">
@@ -1048,7 +1065,7 @@ export default function App() {
             </div>
 
             {/* Map Section */}
-            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm">
               <div className="p-6 border-b border-slate-100">
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
                   <div className="flex items-center gap-3">
@@ -1067,13 +1084,13 @@ export default function App() {
                   </div>
 
                     <div className="flex flex-wrap items-center gap-2">
-                      {(geoFilter.city || geoFilter.department || geoFilter.formationType || geoFilter.radius !== 100) && (
+                      {(geoFilter.city || geoFilter.department || geoFilter.formationTypes.length > 0 || geoFilter.radius !== 1000) && (
                         <button 
                           onClick={() => setGeoFilter({
                             city: '',
                             department: '',
-                            formationType: '',
-                            radius: 100,
+                            formationTypes: [],
+                            radius: 1000,
                             center: geoFilter.center
                           })}
                           className="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-200 transition-colors"
@@ -1081,15 +1098,6 @@ export default function App() {
                           Réinitialiser filtres
                         </button>
                       )}
-                      {selectedForMap.length > 0 && (
-                      <button 
-                        onClick={() => setSelectedForMap([])}
-                        className="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-200 transition-colors flex items-center gap-2"
-                      >
-                        <X className="w-3 h-3" />
-                        Effacer sélection ({selectedForMap.length})
-                      </button>
-                    )}
                     <div className="h-8 w-px bg-slate-200 hidden lg:block mx-2" />
                     <button 
                       onClick={handleLocateUser}
@@ -1102,8 +1110,8 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="h-[550px] w-full relative z-0">
-                {!geoFilter.formationType && selectedForMap.length === 0 ? (
+              <div className="h-[550px] w-full relative z-0 overflow-hidden">
+                {geoFilter.formationTypes.length === 0 ? (
                   <div className="absolute inset-0 z-10 bg-slate-900/5 backdrop-blur-[2px] flex items-center justify-center p-6 text-center">
                     <div className="bg-white p-8 rounded-3xl shadow-xl border border-slate-100 max-w-sm">
                       <div className="w-16 h-16 bg-primary-light rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -1111,17 +1119,14 @@ export default function App() {
                       </div>
                       <h4 className="text-lg font-bold text-slate-900 mb-2">Prêt à explorer ?</h4>
                       <p className="text-sm text-slate-500 mb-6">
-                        Sélectionne un type de formation ou coche des établissements dans le tableau pour les voir sur la carte.
+                        Sélectionne un ou plusieurs types de formation dans le filtre ci-dessous pour les voir sur la carte.
                       </p>
                       <div className="flex flex-col gap-2">
                         <button 
-                          onClick={() => {
-                            const firstType = formationTypes[0];
-                            if (firstType) setGeoFilter(prev => ({ ...prev, formationType: firstType }));
-                          }}
+                          onClick={() => setShowFormationSuggestions(true)}
                           className="w-full py-2.5 bg-primary text-white rounded-xl font-bold text-sm hover:bg-primary-dark transition-colors"
                         >
-                          Voir toutes les formations
+                          Choisir des formations
                         </button>
                       </div>
                     </div>
@@ -1139,20 +1144,27 @@ export default function App() {
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   />
                   {groupedMapFormations.map((group, idx) => (
-                    <Marker key={idx} position={group[0].position}>
+                    <Marker 
+                      key={idx} 
+                      position={group.position}
+                      icon={createMarkerIcon(group.colors)}
+                    >
                       <Popup minWidth={250} maxWidth={320}>
                         <div className="max-h-[350px] overflow-y-auto pr-1 custom-scrollbar">
-                          {group.map((f, fIdx) => (
+                          {group.formations.map((f, fIdx) => (
                             <div key={fIdx} className={cn("p-1", fIdx > 0 && "mt-4 pt-4 border-t border-slate-200")}>
-                              {group.length > 1 && (
+                              {group.formations.length > 1 && (
                                 <div className="flex items-center justify-between mb-2">
                                   <span className="px-1.5 py-0.5 bg-primary-light text-primary text-[9px] font-bold rounded uppercase">
-                                    Formation {fIdx + 1}/{group.length}
+                                    Formation {fIdx + 1}/{group.formations.length}
                                   </span>
                                   <span className="text-[9px] text-slate-400 font-bold uppercase">ID: {f.etablissement.slice(0,3)}...</span>
                                 </div>
                               )}
-                              <h4 className="font-bold text-slate-900 text-sm mb-1">{f.etablissement}</h4>
+                              <div className="flex items-start gap-2 mb-1">
+                                <div className="w-2 h-2 rounded-full mt-1.5 shrink-0" style={{ backgroundColor: getFormationColor(f.filiere_generale) }} />
+                                <h4 className="font-bold text-slate-900 text-sm">{f.etablissement}</h4>
+                              </div>
                               <p className="text-xs text-slate-500 mb-1 leading-relaxed">{f.filiere_formation}</p>
                               <p className="text-xs font-medium text-primary-dark mb-1">{f.selectivite}</p>
                               <p className="text-xs text-slate-500 mb-2">{f.commune} ({f.departement})</p>
@@ -1173,6 +1185,9 @@ export default function App() {
                               <div className="mt-2 pt-2 border-t border-slate-100 flex flex-col gap-2">
                                 <span className="text-[10px] text-slate-400 font-medium italic leading-tight block">
                                   Note moyenne au bac pour les admis: {f.note_moyenne !== null ? `${f.note_moyenne.toFixed(2)}/20` : "N/A"}
+                                </span>
+                                <span className="text-[10px] text-emerald-600 font-bold block">
+                                  Part de boursiers: {f.pct_admis_neo_boursiers !== undefined ? `${f.pct_admis_neo_boursiers}%` : "N/A"}
                                 </span>
                                 {f.lien_parcoursup && (
                                   <a 
@@ -1201,22 +1216,62 @@ export default function App() {
                 </MapContainer>
               </div>
 
-              <div className="p-8 border-t border-slate-100 bg-slate-50/30">
+              <div className="p-8 border-t border-slate-100 bg-slate-50/30 rounded-b-3xl">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5 relative">
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
                       <Search className="w-3 h-3" /> Type de formation
                     </label>
-                    <select 
-                      value={geoFilter.formationType}
-                      onChange={(e) => setGeoFilter(prev => ({ ...prev, formationType: e.target.value }))}
-                      className="w-full text-sm font-bold text-slate-700 bg-white border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none appearance-none cursor-pointer shadow-sm"
-                    >
-                      <option value="">Toutes les formations</option>
-                      {formationTypes.map((type, i) => (
-                        <option key={i} value={type}>{type}</option>
-                      ))}
-                    </select>
+                    <div className="relative">
+                      <button 
+                        onClick={() => setShowFormationSuggestions(!showFormationSuggestions)}
+                        className="w-full text-sm font-bold text-slate-700 bg-white border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none shadow-sm flex items-center justify-between"
+                      >
+                        <span className="truncate">
+                          {geoFilter.formationTypes.length === 0 
+                            ? "Toutes les formations" 
+                            : `${geoFilter.formationTypes.length} sélectionnée(s)`}
+                        </span>
+                        <ChevronDown className={cn("w-4 h-4 transition-transform", showFormationSuggestions && "rotate-180")} />
+                      </button>
+                      
+                      {showFormationSuggestions && (
+                        <>
+                          <div className="fixed inset-0 z-10" onClick={() => setShowFormationSuggestions(false)} />
+                          <div className="absolute bottom-full mb-1 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-xl z-20 max-h-64 overflow-y-auto custom-scrollbar p-2 space-y-1">
+                            {formationTypes.map((type, i) => {
+                              const isSelected = geoFilter.formationTypes.includes(type);
+                              const color = getFormationColor(type);
+                              return (
+                                <label 
+                                  key={i} 
+                                  className={cn(
+                                    "flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors",
+                                    isSelected ? "bg-slate-50" : "hover:bg-slate-50/50"
+                                  )}
+                                >
+                                  <input 
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={() => {
+                                      setGeoFilter(prev => ({
+                                        ...prev,
+                                        formationTypes: isSelected 
+                                          ? prev.formationTypes.filter(t => t !== type)
+                                          : [...prev.formationTypes, type]
+                                      }));
+                                    }}
+                                    className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary"
+                                  />
+                                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
+                                  <span className="text-sm text-slate-600 font-medium">{type}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </>
+                      )}
+                    </div>
                   </div>
 
                   <div className="space-y-1.5 relative">
@@ -1425,7 +1480,9 @@ function StatCard({ title, value, icon, description, color }: StatCardProps) {
       </div>
       <h4 className="text-slate-500 text-sm font-medium mb-1">{title}</h4>
       <div className="text-3xl font-extrabold text-slate-900 mb-2">{value}</div>
-      <p className="text-slate-500 text-xs leading-relaxed">{description}</p>
+      {description && (
+        <p className="text-slate-500 text-xs leading-relaxed">{description}</p>
+      )}
     </div>
   );
 }
