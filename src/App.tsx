@@ -366,7 +366,7 @@ export default function App() {
     };
     
     loadMapData();
-  }, [geoFilter.formationType]);
+  }, [geoFilter.formationTypes]);
 
   useEffect(() => {
     const loadSpecialtyData = async () => {
@@ -1415,10 +1415,10 @@ export default function App() {
             {/* Stats Panel Section */}
             {onboardingData && (
               <StatsPanel 
-                data={mapFormations} 
+                data={geoFilter.department ? mapFormations.filter(d => d.departement === geoFilter.department?.code) : mapFormations} 
                 userNote={parseFloat(onboardingData.averageBac)}
                 selectedDepartment={geoFilter.department || undefined}
-                allDataOfSameType={mapSpecificData}
+                allDataOfSameType={mapFormations}
               />
             )}
           </div>

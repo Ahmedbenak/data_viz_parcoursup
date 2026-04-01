@@ -1,5 +1,5 @@
 {
-  "name": "Orientation Post-Bac",
-  "description": "Guide d'orientation interactif pour lycéens basé sur les statistiques de spécialités.",
-  "requestFramePermissions": ["geolocation"]
+  "name": "Botpress Chatbot Integration",
+  "description": "Une application démontrant l'intégration d'une bulle de discussion Botpress AI.",
+  "requestFramePermissions": []
 }

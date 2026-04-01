@@ -153,6 +153,7 @@ export default function StatsPanel({ data, userNote, selectedDepartment, allData
     return {
       meanNote,
       stdDevNote,
+      tauxAcces: avg(validData.map(d => d.taux_acces || 0)),
       neoGen: avg(validData.map(d => d.pct_admis_neo_gen)),
       neoTechno: avg(validData.map(d => d.pct_admis_neo_techno)),
       neoPro: avg(validData.map(d => d.pct_admis_neo_pro)),
@@ -171,6 +172,18 @@ export default function StatsPanel({ data, userNote, selectedDepartment, allData
       }
     };
   }, [validData]);
+
+  // National Averages for comparison
+  const nationalProfile = useMemo(() => {
+    if (nationalData.length === 0) return null;
+    const avg = (arr: number[]) => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+    
+    return {
+      meanNote: avg(nationalData.map(d => d.note_moyenne!)),
+      tauxAcces: avg(nationalData.map(d => d.taux_acces || 0)),
+      neoGen: avg(nationalData.map(d => d.pct_admis_neo_gen)),
+    };
+  }, [nationalData]);
 
   // Charts Data
   const accessibilityChartData = {
@@ -498,9 +511,9 @@ export default function StatsPanel({ data, userNote, selectedDepartment, allData
 
               {[
                 { label: "Formations", val: validData.length, nat: nationalData.length },
-                { label: "Note moyenne admis", val: profile?.meanNote || 0, nat: nationalData.length > 0 ? nationalData.reduce((a, b) => a + (b.note_moyenne || 0), 0) / nationalData.length : 0, isNote: true },
-                { label: "Taux d'accès moyen", val: Math.round(validData.reduce((a, b) => a + (b.taux_acces || 0), 0) / validData.length), nat: Math.round(nationalData.reduce((a, b) => a + (b.taux_acces || 0), 0) / nationalData.length), isPct: true },
-                { label: "% Bac Général", val: Math.round(profile?.neoGen || 0), nat: Math.round(nationalData.reduce((a, b) => a + b.pct_admis_neo_gen, 0) / nationalData.length), isPct: true }
+                { label: "Note moyenne admis", val: profile?.meanNote || 0, nat: nationalProfile?.meanNote || 0, isNote: true },
+                { label: "Taux d'accès moyen", val: Math.round(profile?.tauxAcces || 0), nat: Math.round(nationalProfile?.tauxAcces || 0), isPct: true },
+                { label: "% Bac Général", val: Math.round(profile?.neoGen || 0), nat: Math.round(nationalProfile?.neoGen || 0), isPct: true }
               ].map((item, i) => (
                 <React.Fragment key={i}>
                   <div className={cn("text-center text-[10px] font-black text-slate-400 uppercase tracking-widest mt-2", selectedDepartment ? "col-span-2" : "col-span-1")}>{item.label}</div>

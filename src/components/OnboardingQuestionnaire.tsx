@@ -34,12 +34,12 @@ const UNIQUE_SPECIALTIES = [
   "Humanités, Littérature et Philosophie",
   "Langues, littératures et cultures étrangères et régionales",
   "Littérature et langues et cultures de l'Antiquité",
-  "Mathématiques Spécialité",
+  "Mathématiques",
   "Numérique et Sciences Informatiques",
-  "Physique-Chimie Spécialité",
-  "Sciences Economiques et Sociales Spécialité",
-  "Sciences de l'ingénieur et sciences physiques",
-  "Sciences de la vie et de la Terre Spécialité",
+  "Physique-Chimie",
+  "Sciences Economiques et Sociales",
+  "Sciences de l'ingénieur",
+  "Sciences de la vie et de la Terre",
   "Éducation physique, pratiques et culture sportives"
 ];
 
@@ -63,11 +63,16 @@ export default function OnboardingQuestionnaire({ onComplete, specialties, loadi
 
   const isValidCombination = React.useMemo(() => {
     if (!data.specialty1 || !data.specialty2) return false;
+    if (specialties.length === 0) return true; // Fallback if data hasn't loaded yet to avoid blocking UI
     
     // Check if any string in the database contains both selected specialties
-    return specialties.some(s => 
-      s.includes(data.specialty1) && s.includes(data.specialty2)
-    );
+    // We use a more flexible match (lowercase and partial)
+    return specialties.some(s => {
+      const lowerS = s.toLowerCase();
+      const spec1 = data.specialty1.toLowerCase();
+      const spec2 = data.specialty2.toLowerCase();
+      return lowerS.includes(spec1) && lowerS.includes(spec2);
+    });
   }, [data.specialty1, data.specialty2, specialties]);
 
   const handleAverageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -87,12 +92,13 @@ export default function OnboardingQuestionnaire({ onComplete, specialties, loadi
     if (!isAverageValid) return;
     
     // Find the actual string in the database that contains both
-    const actualSpecialty = specialties.find(s => 
-      s.includes(data.specialty1) && s.includes(data.specialty2)
-    );
+    const actualSpecialty = specialties.find(s => {
+      const lowerS = s.toLowerCase();
+      const spec1 = data.specialty1.toLowerCase();
+      const spec2 = data.specialty2.toLowerCase();
+      return lowerS.includes(spec1) && lowerS.includes(spec2);
+    }) || `${data.specialty1}, ${data.specialty2}`; // Fallback string if not found in DB
     
-    if (!actualSpecialty) return;
-
     // We pass back a structure that App.tsx expects
     onComplete({
       ...data,
