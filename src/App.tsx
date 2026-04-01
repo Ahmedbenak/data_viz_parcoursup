@@ -154,7 +154,6 @@ function MapUpdater({ center }: { center: [number, number] }) {
 
 export default function App() {
   const [data, setData] = useState<OrientationData[]>([]);
-  const [detailedData, setDetailedData] = useState<Parcoursup2Data[]>([]);
   const [mapSpecificData, setMapSpecificData] = useState<Parcoursup2Data[]>([]);
   const [allFormationTypes, setAllFormationTypes] = useState<string[]>([]);
   const [specialties, setSpecialties] = useState<string[]>([]);
@@ -403,67 +402,8 @@ export default function App() {
         }
 
         if (allOrientationData.length > 0) {
-            const mappedData = mapSupabaseData(allOrientationData);
-            setData(mappedData);
-            
-            // Get the list of formations to filter parcoursup_2
-            const formationsList = allOrientationData.map(row => row.formation).filter(Boolean);
-            
-            // Fetch from parcoursup_2 where filiere_generale matches any of the formations
-            let allP2Data: any[] = [];
-            let p2From = 0;
-            let p2HasMore = true;
-
-            while (p2HasMore) {
-              const { data: p2Data, error: p2Error } = await supabase
-                .from('parcoursup_2')
-                .select('*')
-                .in('filiere_generale', formationsList)
-                .range(p2From, p2From + PAGE_SIZE - 1);
-              
-              if (p2Error) throw p2Error;
-              if (p2Data && p2Data.length > 0) {
-                allP2Data = [...allP2Data, ...p2Data];
-                if (p2Data.length < PAGE_SIZE) {
-                  p2HasMore = false;
-                } else {
-                  p2From += PAGE_SIZE;
-                }
-              } else {
-                p2HasMore = false;
-              }
-            }
-            
-            if (allP2Data.length > 0) {
-            setDetailedData(allP2Data.map(row => ({
-              filiere_generale: row.filiere_generale || "",
-              filiere_formation: row.filiere_formation || "",
-              etablissement: row.etablissement || "",
-              commune: row.commune || "",
-              departement: row.departement || "",
-              region: row.region || "",
-              coordonnees_gps: row.coordonnees_gps || "",
-              eff_admis: Number(row.eff_admis || 0),
-              eff_admis_neo: Number(row.eff_admis_neo || 0),
-              capacite: Number(row.capacite || 0),
-              taux_acces: (row.taux_acces === "nd" || row.taux_acces === null || row.taux_acces === "") ? null : parseFloat(row.taux_acces),
-              note_moyenne: (row.note_moyenne === null || row.note_moyenne === "" || isNaN(Number(row.note_moyenne))) ? null : Number(row.note_moyenne),
-              selectivite: row.selectivite || "",
-              pct_admis_neo_gen: Number(row["pct_admis_neo_gen"] || 0),
-              pct_admis_neo_techno: Number(row["pct_admis_neo_techno"] || 0),
-              pct_admis_neo_pro: Number(row["pct_admis_neo_pro"] || 0),
-              lien_parcoursup: row.lien_parcoursup || "",
-              pct_boursiers: Number(row.pct_boursiers || 0),
-              pct_admis_neo_boursiers: Number(row.pct_admis_neo_boursiers || 0),
-              eff_admis_boursiers_neo: Number(row.eff_admis_boursiers_neo || 0),
-              pct_admises_filles: Number(row.pct_admises_filles || 0),
-              pct_admis_neo_sans_mention: Number(row.pct_admis_neo_sans_mention || 0),
-              pct_admis_neo_mention_ab: Number(row.pct_admis_neo_mention_ab || 0),
-              pct_admis_neo_mention_b: Number(row.pct_admis_neo_mention_b || 0),
-              pct_admis_neo_mention_tb: Number(row.pct_admis_neo_mention_tb || 0),
-              pct_admis_neo_mention_tbf: Number(row.pct_admis_neo_mention_tbf || 0),
-            })));
-          }
+          const mappedData = mapSupabaseData(allOrientationData);
+          setData(mappedData);
         }
       } catch (err: any) {
         console.error('Error loading specialty data:', err);
@@ -551,27 +491,14 @@ export default function App() {
     });
   }, [baseFormations, sortConfig, tableFilterMetric]);
 
+  const unfilteredMapFormations = useMemo(() => {
+    return mapSpecificData;
+  }, [mapSpecificData]);
+
   const mapFormations = useMemo(() => {
-    // If no formation types are selected, show nothing by default
-    if (geoFilter.formationTypes.length === 0) {
-      return [];
-    }
+    let base = [...unfilteredMapFormations];
 
-    // Combine detailedData (from Top 10) and mapSpecificData (from Map Filter)
-    // Use a Map to avoid duplicates by etablissement + filiere_formation + commune
-    const combinedMap = new Map<string, Parcoursup2Data>();
-    
-    detailedData.forEach(f => {
-      combinedMap.set(`${f.etablissement}-${f.filiere_formation}-${f.commune}`, f);
-    });
-    
-    mapSpecificData.forEach(f => {
-      combinedMap.set(`${f.etablissement}-${f.filiere_formation}-${f.commune}`, f);
-    });
-
-    let base = Array.from(combinedMap.values());
-
-    // Filter by Formation Types
+    // Filter by Formation Types (only if explicitly selected in map filter)
     if (geoFilter.formationTypes.length > 0) {
       base = base.filter(f => geoFilter.formationTypes.includes(f.filiere_generale));
     }
@@ -606,7 +533,7 @@ export default function App() {
     }
 
     return mapped;
-  }, [detailedData, mapSpecificData, geoFilter]);
+  }, [unfilteredMapFormations, geoFilter]);
 
   const groupedMapFormations = useMemo(() => {
     const groups = new Map<string, (Parcoursup2Data & { position: [number, number] })[]>();
@@ -1229,7 +1156,7 @@ export default function App() {
                       >
                         <span className="truncate">
                           {geoFilter.formationTypes.length === 0 
-                            ? "Toutes les formations" 
+                            ? "Aucune sélectionnée" 
                             : `${geoFilter.formationTypes.length} sélectionnée(s)`}
                         </span>
                         <ChevronDown className={cn("w-4 h-4 transition-transform", showFormationSuggestions && "rotate-180")} />
@@ -1415,10 +1342,10 @@ export default function App() {
             {/* Stats Panel Section */}
             {onboardingData && (
               <StatsPanel 
-                data={geoFilter.department ? mapFormations.filter(d => d.departement === geoFilter.department?.code) : mapFormations} 
+                data={mapFormations} 
                 userNote={parseFloat(onboardingData.averageBac)}
                 selectedDepartment={geoFilter.department || undefined}
-                allDataOfSameType={mapFormations}
+                allDataOfSameType={unfilteredMapFormations}
               />
             )}
           </div>
