@@ -157,6 +157,7 @@ export default function App() {
   const [mapSpecificData, setMapSpecificData] = useState<Parcoursup2Data[]>([]);
   const [allFormationTypes, setAllFormationTypes] = useState<string[]>([]);
   const [specialties, setSpecialties] = useState<string[]>([]);
+  const [individualSpecialties, setIndividualSpecialties] = useState<string[]>([]);
   const [selectedSpecialty, setSelectedSpecialty] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [loadingDetails, setLoadingDetails] = useState(false);
@@ -245,6 +246,12 @@ export default function App() {
           .sort() as string[];
         
         setSpecialties(uniqueSpecs);
+        
+        // Extract individual specialties from combinations
+        const individual = Array.from(new Set(
+          uniqueSpecs.flatMap(s => s.split(', ').map(part => part.trim()))
+        )).sort();
+        setIndividualSpecialties(individual);
       }
 
       // Load All Formation Types for the map
@@ -622,6 +629,7 @@ export default function App() {
       <OnboardingQuestionnaire 
         onComplete={handleOnboardingComplete} 
         specialties={specialties}
+        individualSpecialties={individualSpecialties}
         loadingSpecialties={loading}
       />
     );

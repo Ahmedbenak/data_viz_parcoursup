@@ -17,6 +17,7 @@ function cn(...inputs: ClassValue[]) {
 interface OnboardingProps {
   onComplete: (data: OnboardingData) => void;
   specialties: string[];
+  individualSpecialties: string[];
   loadingSpecialties: boolean;
 }
 
@@ -27,23 +28,7 @@ export interface OnboardingData {
   averageBac: string;
 }
 
-const UNIQUE_SPECIALTIES = [
-  "Art",
-  "Biologie/Ecologie",
-  "Histoire-Géographie, Géopolitique et Sciences politiques",
-  "Humanités, Littérature et Philosophie",
-  "Langues, littératures et cultures étrangères et régionales",
-  "Littérature et langues et cultures de l'Antiquité",
-  "Mathématiques",
-  "Numérique et Sciences Informatiques",
-  "Physique-Chimie",
-  "Sciences Economiques et Sociales",
-  "Sciences de l'ingénieur",
-  "Sciences de la vie et de la Terre",
-  "Éducation physique, pratiques et culture sportives"
-];
-
-export default function OnboardingQuestionnaire({ onComplete, specialties, loadingSpecialties }: OnboardingProps) {
+export default function OnboardingQuestionnaire({ onComplete, specialties, individualSpecialties, loadingSpecialties }: OnboardingProps) {
   const [data, setData] = useState<OnboardingData>({
     specialty1: '',
     specialty2: '',
@@ -53,26 +38,21 @@ export default function OnboardingQuestionnaire({ onComplete, specialties, loadi
   const [search1, setSearch1] = useState('');
   const [search2, setSearch2] = useState('');
 
-  const filtered1 = UNIQUE_SPECIALTIES.filter(s => 
+  const filtered1 = individualSpecialties.filter(s => 
     s.toLowerCase().includes(search1.toLowerCase())
   );
 
-  const filtered2 = UNIQUE_SPECIALTIES.filter(s => 
+  const filtered2 = individualSpecialties.filter(s => 
     s.toLowerCase().includes(search2.toLowerCase()) && s !== data.specialty1
   );
 
   const isValidCombination = React.useMemo(() => {
     if (!data.specialty1 || !data.specialty2) return false;
-    if (specialties.length === 0) return true; // Fallback if data hasn't loaded yet to avoid blocking UI
     
     // Check if any string in the database contains both selected specialties
-    // We use a more flexible match (lowercase and partial)
-    return specialties.some(s => {
-      const lowerS = s.toLowerCase();
-      const spec1 = data.specialty1.toLowerCase();
-      const spec2 = data.specialty2.toLowerCase();
-      return lowerS.includes(spec1) && lowerS.includes(spec2);
-    });
+    return specialties.some(s => 
+      s.includes(data.specialty1) && s.includes(data.specialty2)
+    );
   }, [data.specialty1, data.specialty2, specialties]);
 
   const handleAverageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -92,13 +72,12 @@ export default function OnboardingQuestionnaire({ onComplete, specialties, loadi
     if (!isAverageValid) return;
     
     // Find the actual string in the database that contains both
-    const actualSpecialty = specialties.find(s => {
-      const lowerS = s.toLowerCase();
-      const spec1 = data.specialty1.toLowerCase();
-      const spec2 = data.specialty2.toLowerCase();
-      return lowerS.includes(spec1) && lowerS.includes(spec2);
-    }) || `${data.specialty1}, ${data.specialty2}`; // Fallback string if not found in DB
+    const actualSpecialty = specialties.find(s => 
+      s.includes(data.specialty1) && s.includes(data.specialty2)
+    );
     
+    if (!actualSpecialty) return;
+
     // We pass back a structure that App.tsx expects
     onComplete({
       ...data,
