@@ -28,7 +28,8 @@ import {
   Target,
   X,
   Building2,
-  Navigation
+  Navigation,
+  Bell
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
