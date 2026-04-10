@@ -1,0 +1,872 @@
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import { motion } from 'motion/react';
+import { 
+  Briefcase, 
+  ArrowLeft, 
+  TrendingUp, 
+  GraduationCap, 
+  Users, 
+  BarChart3,
+  PieChart as PieChartIcon,
+  Calendar,
+  Map as MapIcon,
+  Info,
+  ExternalLink,
+  ChevronRight,
+  MapPin,
+  Target,
+  Search,
+  Navigation,
+  ChevronDown,
+  ArrowRight,
+  Building2
+} from 'lucide-react';
+import { 
+  LineChart, 
+  Line, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer, 
+  BarChart, 
+  Bar, 
+  PieChart, 
+  Pie, 
+  Cell,
+  Legend
+} from 'recharts';
+import { 
+  MapContainer, 
+  TileLayer, 
+  Marker, 
+  Popup,
+  Circle,
+  useMap
+} from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import { getSupabase } from '../lib/supabase';
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+
+// Fix Leaflet marker icons
+import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+
+let DefaultIcon = L.icon({
+    iconUrl: markerIcon,
+    shadowUrl: markerShadow,
+    iconSize: [25, 41],
+    iconAnchor: [12, 41]
+});
+L.Marker.prototype.options.icon = DefaultIcon;
+
+function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const R = 6371; // Radius of the earth in km
+  const dLat = deg2rad(lat2 - lat1);
+  const dLon = deg2rad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const d = R * c; // Distance in km
+  return d;
+}
+
+function deg2rad(deg: number) {
+  return deg * (Math.PI / 180);
+}
+
+function MapUpdater({ center }: { center: [number, number] }) {
+  const map = useMap();
+  useEffect(() => {
+    map.setView(center);
+  }, [center, map]);
+  return null;
+}
+
+interface ProPageProps {
+  onBack: () => void;
+}
+
+const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+
+export default function ProPage({ onBack }: ProPageProps) {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Data states
+  const [trajectoryData, setTrajectoryData] = useState<any[]>([]);
+  const [outcomeData, setOutcomeData] = useState<any[]>([]);
+  const [topFormations, setTopFormations] = useState<any[]>([]);
+  const [evolutionData, setEvolutionData] = useState<any[]>([]);
+  const [stats, setStats] = useState({
+    avgEmployment: 0,
+    avgStudies: 0,
+    totalFormations: 0
+  });
+
+  // Map states
+  const [mapData, setMapData] = useState<any[]>([]);
+  const [allCities, setAllCities] = useState<string[]>([]);
+  const [allDepartments, setAllDepartments] = useState<string[]>([]);
+  const [showCitySuggestions, setShowCitySuggestions] = useState(false);
+  const [showDeptSuggestions, setShowDeptSuggestions] = useState(false);
+  const [geoFilter, setGeoFilter] = useState({
+    center: [46.603354, 1.888334] as [number, number],
+    radius: 1000,
+    city: '',
+    department: ''
+  });
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const supabase = getSupabase();
+        const currentYear = 'cumul 2023-2024';
+
+        // 1. Fetch global stats from parcoursup_pro
+        const { data: proData, error: proError } = await supabase
+          .from('parcoursup_pro')
+          .select('taux_emploi_6mois, devenir_part_poursuite_etudes')
+          .eq('annee', currentYear)
+          .eq('dont_apprentis_eple', 'ensemble');
+
+        // 2. Fetch data for Trajectory and Outcomes (Bac Pro, current year)
+        const { data: fineData, error: fineError } = await supabase
+          .from('parcoursup_fine_clean')
+          .select('*')
+          .eq('annee', currentYear)
+          .eq('type_diplome', 'BAC PRO');
+
+        if (fineError) throw fineError;
+
+        if (fineData && fineData.length > 0) {
+          // Calculate Trajectory
+          const trajectory = [
+            { name: '6 mois', value: calculateAvg(fineData, 'taux_emploi_6mois') },
+            { name: '12 mois', value: calculateAvg(fineData, 'taux_emploi_12mois') },
+            { name: '18 mois', value: calculateAvg(fineData, 'taux_emploi_18mois') },
+            { name: '24 mois', value: calculateAvg(fineData, 'taux_emploi_24mois') },
+          ].filter(d => d.value !== null);
+          setTrajectoryData(trajectory);
+
+          // Calculate Outcomes
+          const outcomes = [
+            { name: 'Emploi', value: calculateAvg(fineData, 'devenir_part_emploi_6mois') },
+            { name: 'Études', value: calculateAvg(fineData, 'devenir_part_poursuite_etudes') },
+            { name: 'Autre', value: calculateAvg(fineData, 'devenir_part_autre_situation_6mois') },
+          ].filter(d => d.value !== null);
+          setOutcomeData(outcomes);
+
+          // Top Formations
+          const formationGroups: { [key: string]: { sum: number, count: number } } = {};
+          fineData.forEach(item => {
+            const val = parseNumeric(item.taux_emploi_6mois);
+            if (val !== null && item.libelle_formation) {
+              const name = item.libelle_formation.charAt(0).toUpperCase() + item.libelle_formation.slice(1);
+              if (!formationGroups[name]) formationGroups[name] = { sum: 0, count: 0 };
+              formationGroups[name].sum += val;
+              formationGroups[name].count += 1;
+            }
+          });
+
+          const top = Object.entries(formationGroups)
+            .map(([name, data]) => ({
+              name,
+              value: Math.round((data.sum / data.count) * 10) / 10
+            }))
+            .sort((a, b) => b.value - a.value)
+            .slice(0, 10);
+          setTopFormations(top);
+
+          // Global Stats
+          setStats({
+            avgEmployment: (proData && proData.length > 0) 
+              ? (calculateAvg(proData, 'taux_emploi_6mois') || calculateAvg(fineData, 'taux_emploi_6mois') || 0)
+              : (calculateAvg(fineData, 'taux_emploi_6mois') || 0),
+            avgStudies: (proData && proData.length > 0)
+              ? (calculateAvg(proData, 'devenir_part_poursuite_etudes') || calculateAvg(fineData, 'devenir_part_poursuite_etudes') || 0)
+              : (calculateAvg(fineData, 'devenir_part_poursuite_etudes') || 0),
+            totalFormations: new Set(fineData.map(d => d.libelle_formation)).size
+          });
+        }
+
+        // 3. Fetch Evolution Data
+        const { data: evolData, error: evolError } = await supabase
+          .from('parcoursup_fine_clean')
+          .select('annee, taux_emploi_6mois')
+          .eq('type_diplome', 'BAC PRO');
+
+        if (evolData && evolData.length > 0) {
+          const yearOrder = [
+            'cumul 2018-2019', 'cumul 2019-2020', 'cumul 2020-2021',
+            'cumul 2021-2022', 'cumul 2022-2023', 'cumul 2023-2024'
+          ];
+          const yearGroups: { [key: string]: { sum: number, count: number } } = {};
+          evolData.forEach(item => {
+            const val = parseNumeric(item.taux_emploi_6mois);
+            if (val !== null) {
+              if (!yearGroups[item.annee]) yearGroups[item.annee] = { sum: 0, count: 0 };
+              yearGroups[item.annee].sum += val;
+              yearGroups[item.annee].count += 1;
+            }
+          });
+          const evolution = yearOrder
+            .filter(year => yearGroups[year])
+            .map(year => ({
+              name: year.replace('cumul ', ''),
+              value: Math.round((yearGroups[year].sum / yearGroups[year].count) * 10) / 10
+            }));
+          setEvolutionData(evolution);
+        }
+
+        // 4. Fetch Map Data (Formations that admit Bac Pro students)
+        const { data: mapRawData, error: mapError } = await supabase
+          .from('parcoursup_2')
+          .select('*')
+          .gt('pct_admis_neo_pro', 0)
+          .limit(1000);
+
+        if (!mapError && mapRawData) {
+          const processedMapData = mapRawData.map(f => {
+            const coords = f.coordonnees_gps.split(',').map((c: string) => parseFloat(c.trim()));
+            return {
+              ...f,
+              position: (coords.length === 2 && !isNaN(coords[0]) && !isNaN(coords[1])) ? coords as [number, number] : null
+            };
+          }).filter(f => f.position !== null);
+          setMapData(processedMapData);
+
+          // Extract cities and departments
+          const cities = Array.from(new Set(mapRawData.map(f => f.commune))).filter(Boolean).sort() as string[];
+          const depts = Array.from(new Set(mapRawData.map(f => f.departement))).filter(Boolean).sort() as string[];
+          setAllCities(cities);
+          setAllDepartments(depts);
+        }
+
+      } catch (err: any) {
+        console.error('Error fetching Pro data:', err);
+        setError("Impossible de charger les données statistiques.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  const filteredMapData = useMemo(() => {
+    let base = [...mapData];
+
+    if (geoFilter.city) {
+      base = base.filter(f => f.commune.toLowerCase().includes(geoFilter.city.toLowerCase()));
+    }
+
+    if (geoFilter.department) {
+      base = base.filter(f => 
+        f.departement.toLowerCase().includes(geoFilter.department.toLowerCase()) ||
+        (f.departement.match(/\(([^)]+)\)/)?.[1] || "").includes(geoFilter.department)
+      );
+    }
+
+    if (geoFilter.radius < 1000) {
+      base = base.filter(f => {
+        const dist = getDistance(geoFilter.center[0], geoFilter.center[1], f.position![0], f.position![1]);
+        return dist <= geoFilter.radius;
+      });
+    }
+
+    return base;
+  }, [mapData, geoFilter]);
+
+  const groupedMapData = useMemo(() => {
+    const groups = new Map<string, any[]>();
+    filteredMapData.forEach(f => {
+      const key = f.coordonnees_gps;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(f);
+    });
+    return Array.from(groups.values()).map(group => ({
+      formations: group,
+      position: group[0].position
+    }));
+  }, [filteredMapData]);
+
+  const filteredCities = useMemo(() => {
+    if (!geoFilter.city) return allCities.slice(0, 10);
+    return allCities.filter(c => c.toLowerCase().includes(geoFilter.city.toLowerCase())).slice(0, 10);
+  }, [allCities, geoFilter.city]);
+
+  const filteredDepts = useMemo(() => {
+    if (!geoFilter.department) return allDepartments.slice(0, 10);
+    return allDepartments.filter(d => d.toLowerCase().includes(geoFilter.department.toLowerCase())).slice(0, 10);
+  }, [allDepartments, geoFilter.department]);
+
+  const handleLocateUser = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition((position) => {
+        setGeoFilter(prev => ({
+          ...prev,
+          center: [position.coords.latitude, position.coords.longitude]
+        }));
+      });
+    }
+  };
+
+  const parseNumeric = (val: any): number | null => {
+    if (val === null || val === undefined || val === '') return null;
+    const num = typeof val === 'string' ? parseFloat(val.replace(',', '.')) : val;
+    return isNaN(num) ? null : num;
+  };
+
+  const calculateAvg = (data: any[], column: string) => {
+    const values = data
+      .map(d => parseNumeric(d[column]))
+      .filter((v): v is number => v !== null);
+    
+    if (values.length === 0) return null;
+    const sum = values.reduce((acc, val) => acc + val, 0);
+    return Math.round((sum / values.length) * 10) / 10;
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+          <p className="text-slate-500 font-medium animate-pulse">Chargement des données InserJeunes...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-50 pb-20">
+      {/* Header */}
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={onBack}
+              className="p-2 hover:bg-slate-100 rounded-xl transition-colors text-slate-500"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
+                <Briefcase className="w-5 h-5 text-white" />
+              </div>
+              <h1 className="text-xl font-bold text-slate-900">Espace Bac Pro</h1>
+            </div>
+          </div>
+          
+          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold">
+            <Info className="w-3.5 h-3.5" />
+            Données InserJeunes 2024
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* KPI Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <KPICard 
+            title="Taux d'emploi à 6 mois"
+            value={`${stats.avgEmployment}%`}
+            icon={<TrendingUp className="w-6 h-6 text-emerald-500" />}
+            description="Moyenne nationale Bac Pro"
+            color="emerald"
+          />
+          <KPICard 
+            title="Poursuite d'études"
+            value={`${stats.avgStudies}%`}
+            icon={<GraduationCap className="w-6 h-6 text-blue-500" />}
+            description="Taux moyen de poursuite"
+            color="blue"
+          />
+          <KPICard 
+            title="Formations analysées"
+            value={stats.totalFormations.toString()}
+            icon={<Users className="w-6 h-6 text-amber-500" />}
+            description="Spécialités différentes"
+            color="amber"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+          {/* Trajectory Chart */}
+          <ChartContainer title="Trajectoire d'insertion professionnelle" icon={<TrendingUp className="w-5 h-5" />}>
+            <div className="h-[300px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={trajectoryData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} unit="%" />
+                  <Tooltip 
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                    formatter={(value: number) => [`${value}%`, "Taux d'emploi"]}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="value" 
+                    stroke="#3b82f6" 
+                    strokeWidth={4} 
+                    dot={{ r: 6, fill: '#3b82f6', strokeWidth: 2, stroke: '#fff' }}
+                    activeDot={{ r: 8, strokeWidth: 0 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+            <p className="text-xs text-slate-400 mt-4 italic">
+              Évolution du taux d'emploi de 6 à 24 mois après l'obtention du diplôme.
+            </p>
+          </ChartContainer>
+
+          {/* Outcome Pie Chart */}
+          <ChartContainer title="Devenir des diplômés (à 6 mois)" icon={<PieChartIcon className="w-5 h-5" />}>
+            <div className="h-[300px] w-full flex items-center justify-center">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={outcomeData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {outcomeData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                    formatter={(value: number) => [`${value}%`, "Part"]}
+                  />
+                  <Legend verticalAlign="bottom" height={36}/>
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </ChartContainer>
+        </div>
+
+        <div className="grid grid-cols-1 gap-8 mb-8">
+          {/* Top Formations */}
+          <ChartContainer title="Top 10 des formations par taux d'emploi" icon={<BarChart3 className="w-5 h-5" />}>
+            <div className="h-[400px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={topFormations} layout="vertical" margin={{ left: 40, right: 40 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+                  <XAxis type="number" hide />
+                  <YAxis 
+                    dataKey="name" 
+                    type="category" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fill: '#1e293b', fontSize: 11, fontWeight: 600 }}
+                    width={150}
+                  />
+                  <Tooltip 
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                    formatter={(value: number) => [`${value}%`, "Taux d'emploi"]}
+                  />
+                  <Bar dataKey="value" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={20}>
+                    {topFormations.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </ChartContainer>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+          {/* Evolution Chart */}
+          <ChartContainer title="Évolution du taux d'emploi (2019-2024)" icon={<Calendar className="w-5 h-5" />}>
+            <div className="h-[300px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={evolutionData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} unit="%" domain={['auto', 'auto']} />
+                  <Tooltip 
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                    formatter={(value: number) => [`${value}%`, "Taux d'emploi"]}
+                  />
+                  <Line 
+                    type="stepAfter" 
+                    dataKey="value" 
+                    stroke="#8b5cf6" 
+                    strokeWidth={3} 
+                    dot={{ r: 4, fill: '#8b5cf6' }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </ChartContainer>
+
+          {/* Outcome Pie Chart */}
+          <ChartContainer title="Devenir des diplômés (à 6 mois)" icon={<PieChartIcon className="w-5 h-5" />}>
+            <div className="h-[300px] w-full flex items-center justify-center">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={outcomeData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {outcomeData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                    formatter={(value: number) => [`${value}%`, "Part"]}
+                  />
+                  <Legend verticalAlign="bottom" height={36}/>
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </ChartContainer>
+        </div>
+
+        {/* Map Section */}
+        <div className="mb-12">
+          <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-xl overflow-hidden">
+            <div className="p-8 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div>
+                <h3 className="text-2xl font-black text-slate-900 flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-primary-light rounded-xl">
+                    <MapIcon className="w-6 h-6 text-primary" />
+                  </div>
+                  Où se former ?
+                </h3>
+                <p className="text-slate-500 font-medium">Explore les établissements qui accueillent des bacheliers pro.</p>
+              </div>
+              
+              <div className="flex items-center gap-3">
+                <button 
+                  onClick={handleLocateUser}
+                  className="px-4 py-2 bg-primary-light text-primary rounded-xl font-bold text-sm hover:bg-primary hover:text-white transition-all flex items-center gap-2"
+                >
+                  <Target className="w-4 h-4" />
+                  Ma position
+                </button>
+              </div>
+            </div>
+
+            <div className="h-[550px] w-full relative z-0 overflow-hidden">
+              <MapContainer 
+                center={geoFilter.center} 
+                zoom={6} 
+                style={{ height: '100%', width: '100%' }}
+                scrollWheelZoom={false}
+              >
+                <MapUpdater center={geoFilter.center} />
+                <TileLayer
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                />
+                {groupedMapData.map((group, idx) => (
+                  <Marker 
+                    key={idx} 
+                    position={group.position}
+                  >
+                    <Popup minWidth={250} maxWidth={320}>
+                      <div className="max-h-[350px] overflow-y-auto pr-1 custom-scrollbar">
+                        {group.formations.map((f: any, fIdx: number) => (
+                          <div key={fIdx} className={cn("p-1", fIdx > 0 && "mt-4 pt-4 border-t border-slate-200")}>
+                            <div className="flex items-start gap-2 mb-1">
+                              <div className="w-2 h-2 rounded-full mt-1.5 shrink-0 bg-primary" />
+                              <h4 className="font-bold text-slate-900 text-sm">{f.etablissement}</h4>
+                            </div>
+                            <p className="text-xs text-slate-500 mb-1 leading-relaxed">{f.filiere_formation}</p>
+                            <p className="text-xs font-medium text-primary-dark mb-1">{f.selectivite}</p>
+                            <p className="text-xs text-slate-500 mb-2">{f.commune} ({f.departement})</p>
+                            
+                            <div className="grid grid-cols-2 gap-2">
+                              <div className="bg-slate-50 p-2 rounded-lg">
+                                <span className="block text-[10px] text-slate-400 uppercase font-bold">Taux Accès</span>
+                                <span className="text-sm font-bold text-primary">
+                                  {f.taux_acces !== null ? `${f.taux_acces}%` : "Inconnu"}
+                                </span>
+                              </div>
+                              <div className="bg-slate-50 p-2 rounded-lg">
+                                <span className="block text-[10px] text-slate-400 uppercase font-bold">% Bac Pro</span>
+                                <span className="text-sm font-bold text-slate-700">{f.pct_admis_neo_pro}%</span>
+                              </div>
+                            </div>
+                            
+                            {f.lien_parcoursup && (
+                              <div className="mt-2 pt-2 border-t border-slate-100">
+                                <a 
+                                  href={f.lien_parcoursup} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="text-[10px] font-black text-primary hover:underline flex items-center gap-1 uppercase tracking-wider"
+                                >
+                                  Voir sur Parcoursup <ArrowRight className="w-3 h-3" />
+                                </a>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </Popup>
+                  </Marker>
+                ))}
+                {geoFilter.radius < 1000 && (
+                  <Circle 
+                    center={geoFilter.center} 
+                    radius={geoFilter.radius * 1000} 
+                    pathOptions={{ color: '#e30613', fillColor: '#e30613', fillOpacity: 0.1 }} 
+                  />
+                )}
+              </MapContainer>
+            </div>
+
+            <div className="p-8 border-t border-slate-100 bg-slate-50/30 rounded-b-3xl">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-1.5 relative">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <Building2 className="w-3 h-3" /> Ville
+                  </label>
+                  <div className="relative">
+                    <input 
+                      type="text"
+                      placeholder="Ex: Paris, Lyon..."
+                      value={geoFilter.city}
+                      onChange={(e) => {
+                        const newCity = e.target.value;
+                        setGeoFilter(prev => ({ 
+                          ...prev, 
+                          city: newCity,
+                          radius: newCity ? 1000 : prev.radius 
+                        }));
+                        setShowCitySuggestions(true);
+                      }}
+                      onFocus={() => setShowCitySuggestions(true)}
+                      className="w-full text-sm font-bold text-slate-700 bg-white border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none shadow-sm"
+                    />
+                    <button 
+                      onClick={() => setShowCitySuggestions(!showCitySuggestions)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    >
+                      <ChevronDown className={cn("w-4 h-4 transition-transform", showCitySuggestions && "rotate-180")} />
+                    </button>
+                  </div>
+                  
+                  {showCitySuggestions && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setShowCitySuggestions(false)} />
+                      <div className="absolute bottom-full left-0 right-0 mb-1 bg-white border border-slate-200 rounded-xl shadow-xl z-20 max-h-48 overflow-y-auto custom-scrollbar overflow-x-hidden">
+                        {filteredCities.length > 0 ? (
+                          filteredCities.map((city, idx) => (
+                            <button
+                              key={idx}
+                              onClick={() => {
+                                setGeoFilter(prev => ({ ...prev, city, radius: 1000 }));
+                                setShowCitySuggestions(false);
+                              }}
+                              className="w-full text-left px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-primary transition-colors flex items-center gap-2"
+                            >
+                              <MapPin className="w-3 h-3 text-slate-300" />
+                              {city}
+                            </button>
+                          ))
+                        ) : (
+                          <div className="px-4 py-3 text-xs text-slate-400 italic">Aucune ville trouvée</div>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <div className="space-y-1.5 relative">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <MapPin className="w-3 h-3" /> Département
+                  </label>
+                  <div className="relative">
+                    <input 
+                      type="text"
+                      placeholder="Ex: Paris, Haute-Garonne..."
+                      value={geoFilter.department}
+                      onChange={(e) => {
+                        const newDept = e.target.value;
+                        setGeoFilter(prev => ({ 
+                          ...prev, 
+                          department: newDept,
+                          radius: newDept ? 1000 : prev.radius
+                        }));
+                        setShowDeptSuggestions(true);
+                      }}
+                      onFocus={() => setShowDeptSuggestions(true)}
+                      className="w-full text-sm font-bold text-slate-700 bg-white border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none shadow-sm"
+                    />
+                    <button 
+                      onClick={() => setShowDeptSuggestions(!showDeptSuggestions)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    >
+                      <ChevronDown className={cn("w-4 h-4 transition-transform", showDeptSuggestions && "rotate-180")} />
+                    </button>
+                  </div>
+                  
+                  {showDeptSuggestions && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setShowDeptSuggestions(false)} />
+                      <div className="absolute bottom-full left-0 right-0 mb-1 bg-white border border-slate-200 rounded-xl shadow-xl z-20 max-h-48 overflow-y-auto custom-scrollbar overflow-x-hidden">
+                        {filteredDepts.length > 0 ? (
+                          filteredDepts.map((dept, idx) => (
+                            <button
+                              key={idx}
+                              onClick={() => {
+                                setGeoFilter(prev => ({ ...prev, department: dept, radius: 1000 }));
+                                setShowDeptSuggestions(false);
+                              }}
+                              className="w-full text-left px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-primary transition-colors flex items-center gap-2"
+                            >
+                              <MapPin className="w-3 h-3 text-slate-300" />
+                              {dept}
+                            </button>
+                          ))
+                        ) : (
+                          <div className="px-4 py-3 text-xs text-slate-400 italic">Aucun département trouvé</div>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <Navigation className="w-3 h-3" /> Rayon de recherche
+                  </label>
+                  <select 
+                    value={geoFilter.radius}
+                    onChange={(e) => {
+                      const newRadius = Number(e.target.value);
+                      setGeoFilter(prev => ({ 
+                        ...prev, 
+                        radius: newRadius,
+                        city: newRadius < 1000 ? '' : prev.city,
+                        department: newRadius < 1000 ? '' : prev.department
+                      }));
+                    }}
+                    className="w-full text-sm font-bold text-slate-700 bg-white border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none appearance-none cursor-pointer shadow-sm"
+                  >
+                    <option value={10}>10 km (Proximité immédiate)</option>
+                    <option value={30}>30 km (Zone urbaine)</option>
+                    <option value={100}>100 km (Rayon régional)</option>
+                    <option value={250}>250 km (Grand secteur)</option>
+                    <option value={1000}>France entière (Pas de limite)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-8">
+          {/* External Links */}
+          <div className="flex flex-col gap-4">
+            <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2 mb-2">
+              <MapIcon className="w-5 h-5 text-blue-500" />
+              Ressources utiles
+            </h3>
+            <ExternalLinkCard 
+              title="Le guide des BTS"
+              description="Découvre toutes les options de poursuite d'études après ton Bac Pro."
+              url="https://www.letudiant.fr/etudes/bts.html"
+            />
+            <ExternalLinkCard 
+              title="Fiches Métiers"
+              description="Explore plus de 600 métiers et les formations pour y accéder."
+              url="https://www.letudiant.fr/metiers.html"
+            />
+            <ExternalLinkCard 
+              title="InserJeunes"
+              description="Consulte les données officielles d'insertion par établissement."
+              url="https://www.inserjeunes.education.gouv.fr/diffusion/accueil"
+            />
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+function KPICard({ title, value, icon, description, color }: { title: string, value: string, icon: React.ReactNode, description: string, color: 'emerald' | 'blue' | 'amber' }) {
+  const colors = {
+    emerald: "bg-emerald-50 border-emerald-100",
+    blue: "bg-blue-50 border-blue-100",
+    amber: "bg-amber-50 border-amber-100"
+  };
+
+  return (
+    <div className={cn("p-6 rounded-[2rem] border shadow-sm", colors[color])}>
+      <div className="flex items-center justify-between mb-4">
+        <div className="p-3 bg-white rounded-2xl shadow-sm">
+          {icon}
+        </div>
+      </div>
+      <h4 className="text-slate-500 text-sm font-medium mb-1">{title}</h4>
+      <div className="text-3xl font-black text-slate-900 mb-1">{value}</div>
+      <p className="text-slate-400 text-xs font-medium">{description}</p>
+    </div>
+  );
+}
+
+function ChartContainer({ title, icon, children }: { title: string, icon: React.ReactNode, children: React.ReactNode }) {
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm"
+    >
+      <div className="flex items-center gap-3 mb-8">
+        <div className="p-2.5 bg-slate-50 rounded-xl text-slate-400">
+          {icon}
+        </div>
+        <h3 className="text-lg font-bold text-slate-900">{title}</h3>
+      </div>
+      {children}
+    </motion.div>
+  );
+}
+
+function ExternalLinkCard({ title, description, url }: { title: string, description: string, url: string }) {
+  return (
+    <a 
+      href={url} 
+      target="_blank" 
+      rel="noopener noreferrer"
+      className="group p-6 bg-white border border-slate-100 rounded-3xl hover:border-blue-500 hover:shadow-lg hover:shadow-blue-500/5 transition-all flex items-center justify-between"
+    >
+      <div className="flex-1">
+        <h4 className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors flex items-center gap-2">
+          {title}
+          <ExternalLink className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+        </h4>
+        <p className="text-sm text-slate-500 line-clamp-1">{description}</p>
+      </div>
+      <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center group-hover:bg-blue-50 transition-colors">
+        <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-blue-500 transition-colors" />
+      </div>
+    </a>
+  );
+}
