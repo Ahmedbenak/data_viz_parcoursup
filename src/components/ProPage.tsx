@@ -66,6 +66,25 @@ let DefaultIcon = L.icon({
 });
 L.Marker.prototype.options.icon = DefaultIcon;
 
+const createMarkerIcon = (colors: string[]) => {
+  if (colors.length === 1) {
+    return L.divIcon({
+      className: 'custom-marker',
+      html: `<div style="background-color: ${colors[0]}; width: 14px; height: 14px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>`,
+      iconSize: [14, 14],
+      iconAnchor: [7, 7]
+    });
+  } else {
+    const gradient = `conic-gradient(${colors.map((c, i) => `${c} ${i * (360/colors.length)}deg ${(i+1) * (360/colors.length)}deg`).join(', ')})`;
+    return L.divIcon({
+      className: 'custom-marker',
+      html: `<div style="background: ${gradient}; width: 18px; height: 18px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>`,
+      iconSize: [18, 18],
+      iconAnchor: [9, 9]
+    });
+  }
+};
+
 function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
   const R = 6371; // Radius of the earth in km
   const dLat = deg2rad(lat2 - lat1);
@@ -116,14 +135,31 @@ export default function ProPage({ onBack }: ProPageProps) {
   const [mapData, setMapData] = useState<any[]>([]);
   const [allCities, setAllCities] = useState<string[]>([]);
   const [allDepartments, setAllDepartments] = useState<string[]>([]);
+  const [allFormationTypes, setAllFormationTypes] = useState<string[]>([]);
   const [showCitySuggestions, setShowCitySuggestions] = useState(false);
   const [showDeptSuggestions, setShowDeptSuggestions] = useState(false);
+  const [showFormationSuggestions, setShowFormationSuggestions] = useState(false);
   const [geoFilter, setGeoFilter] = useState({
     center: [46.603354, 1.888334] as [number, number],
     radius: 1000,
     city: '',
-    department: ''
+    department: '',
+    formationTypes: [] as string[]
   });
+
+  // Dynamic Color Mapping based on all loaded formation types
+  const typeColorMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    allFormationTypes.forEach((type, index) => {
+      const hue = (index * 360) / Math.max(1, allFormationTypes.length);
+      map[type] = `hsl(${hue}, 75%, 45%)`;
+    });
+    return map;
+  }, [allFormationTypes]);
+
+  const getFormationColor = useCallback((type: string) => {
+    return typeColorMap[type] || '#64748b';
+  }, [typeColorMap]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -248,8 +284,10 @@ export default function ProPage({ onBack }: ProPageProps) {
           // Extract cities and departments
           const cities = Array.from(new Set(mapRawData.map(f => f.commune))).filter(Boolean).sort() as string[];
           const depts = Array.from(new Set(mapRawData.map(f => f.departement))).filter(Boolean).sort() as string[];
+          const types = Array.from(new Set(mapRawData.map(f => f.filiere_generale))).filter(Boolean).sort() as string[];
           setAllCities(cities);
           setAllDepartments(depts);
+          setAllFormationTypes(types);
         }
 
       } catch (err: any) {
@@ -265,6 +303,10 @@ export default function ProPage({ onBack }: ProPageProps) {
 
   const filteredMapData = useMemo(() => {
     let base = [...mapData];
+
+    if (geoFilter.formationTypes.length > 0) {
+      base = base.filter(f => geoFilter.formationTypes.includes(f.filiere_generale));
+    }
 
     if (geoFilter.city) {
       base = base.filter(f => f.commune.toLowerCase().includes(geoFilter.city.toLowerCase()));
@@ -294,11 +336,16 @@ export default function ProPage({ onBack }: ProPageProps) {
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key)!.push(f);
     });
-    return Array.from(groups.values()).map(group => ({
-      formations: group,
-      position: group[0].position
-    }));
-  }, [filteredMapData]);
+    return Array.from(groups.values()).map(group => {
+      const types = Array.from(new Set(group.map(f => f.filiere_generale)));
+      return {
+        formations: group,
+        position: group[0].position,
+        types,
+        colors: types.map(t => getFormationColor(t))
+      };
+    });
+  }, [filteredMapData, getFormationColor]);
 
   const filteredCities = useMemo(() => {
     if (!geoFilter.city) return allCities.slice(0, 10);
@@ -351,26 +398,23 @@ export default function ProPage({ onBack }: ProPageProps) {
   return (
     <div className="min-h-screen bg-slate-50 pb-20">
       {/* Header */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
+      <header className="bg-primary sticky top-0 z-50 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <svg viewBox="0 0 160 40" className="h-9 w-auto fill-white" xmlns="http://www.w3.org/2000/svg">
+              <text x="0" y="32" fontFamily="Arial, sans-serif" fontWeight="900" fontStyle="italic" fontSize="28" fill="white">l'Étudiant</text>
+            </svg>
+          </div>
+          
           <div className="flex items-center gap-4">
             <button 
               onClick={onBack}
-              className="p-2 hover:bg-slate-100 rounded-xl transition-colors text-slate-500"
+              className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl border border-white/20 transition-all text-sm font-bold shadow-sm"
             >
-              <ArrowLeft className="w-5 h-5" />
+              <Users className="w-4 h-4" />
+              <span className="hidden sm:inline">Modifier mon profil</span>
+              <span className="sm:hidden">Profil</span>
             </button>
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
-                <Briefcase className="w-5 h-5 text-white" />
-              </div>
-              <h1 className="text-xl font-bold text-slate-900">Espace Bac Pro</h1>
-            </div>
-          </div>
-          
-          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold">
-            <Info className="w-3.5 h-3.5" />
-            Données InserJeunes 2024
           </div>
         </div>
       </header>
@@ -546,30 +590,73 @@ export default function ProPage({ onBack }: ProPageProps) {
 
         {/* Map Section */}
         <div className="mb-12">
-          <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-xl overflow-hidden">
-            <div className="p-8 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-6">
-              <div>
-                <h3 className="text-2xl font-black text-slate-900 flex items-center gap-3 mb-2">
-                  <div className="p-2 bg-primary-light rounded-xl">
-                    <MapIcon className="w-6 h-6 text-primary" />
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-6 border-b border-slate-100">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-primary-light rounded-2xl flex items-center justify-center">
+                    <MapPin className="w-6 h-6 text-primary" />
                   </div>
-                  Où se former ?
-                </h3>
-                <p className="text-slate-500 font-medium">Explore les établissements qui accueillent des bacheliers pro.</p>
-              </div>
-              
-              <div className="flex items-center gap-3">
-                <button 
-                  onClick={handleLocateUser}
-                  className="px-4 py-2 bg-primary-light text-primary rounded-xl font-bold text-sm hover:bg-primary hover:text-white transition-all flex items-center gap-2"
-                >
-                  <Target className="w-4 h-4" />
-                  Ma position
-                </button>
+                  <div>
+                    <h3 className="text-xl font-bold text-slate-900">Carte des formations</h3>
+                    <p className="text-sm text-slate-500">
+                      {filteredMapData.length > 0 
+                        ? `${filteredMapData.length} établissement${filteredMapData.length > 1 ? 's' : ''} trouvé${filteredMapData.length > 1 ? 's' : ''}`
+                        : "Explore les établissements par zone géographique"
+                      }
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex flex-wrap items-center gap-2">
+                  {(geoFilter.city || geoFilter.department || geoFilter.formationTypes.length > 0 || geoFilter.radius !== 1000) && (
+                    <button 
+                      onClick={() => setGeoFilter({
+                        city: '',
+                        department: '',
+                        formationTypes: [],
+                        radius: 1000,
+                        center: geoFilter.center
+                      })}
+                      className="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-200 transition-colors"
+                    >
+                      Réinitialiser filtres
+                    </button>
+                  )}
+                  <div className="h-8 w-px bg-slate-200 hidden lg:block mx-2" />
+                  <button 
+                    onClick={handleLocateUser}
+                    className="px-4 py-2 bg-primary-light text-primary rounded-xl font-bold text-sm hover:bg-primary hover:text-white transition-all flex items-center gap-2"
+                  >
+                    <Target className="w-4 h-4" />
+                    Ma position
+                  </button>
+                </div>
               </div>
             </div>
 
             <div className="h-[550px] w-full relative z-0 overflow-hidden">
+              {geoFilter.formationTypes.length === 0 ? (
+                <div className="absolute inset-0 z-10 bg-slate-900/5 backdrop-blur-[2px] flex items-center justify-center p-6 text-center">
+                  <div className="bg-white p-8 rounded-3xl shadow-xl border border-slate-100 max-w-sm">
+                    <div className="w-16 h-16 bg-primary-light rounded-2xl flex items-center justify-center mx-auto mb-4">
+                      <Search className="w-8 h-8 text-primary" />
+                    </div>
+                    <h4 className="text-lg font-bold text-slate-900 mb-2">Prêt à explorer ?</h4>
+                    <p className="text-sm text-slate-500 mb-6">
+                      Sélectionne un ou plusieurs types de formation dans le filtre ci-dessous pour les voir sur la carte.
+                    </p>
+                    <div className="flex flex-col gap-2">
+                      <button 
+                        onClick={() => setShowFormationSuggestions(true)}
+                        className="w-full py-2.5 bg-primary text-white rounded-xl font-bold text-sm hover:bg-primary-dark transition-colors"
+                      >
+                        Choisir des formations
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
               <MapContainer 
                 center={geoFilter.center} 
                 zoom={6} 
@@ -585,13 +672,22 @@ export default function ProPage({ onBack }: ProPageProps) {
                   <Marker 
                     key={idx} 
                     position={group.position}
+                    icon={createMarkerIcon(group.colors)}
                   >
                     <Popup minWidth={250} maxWidth={320}>
                       <div className="max-h-[350px] overflow-y-auto pr-1 custom-scrollbar">
                         {group.formations.map((f: any, fIdx: number) => (
                           <div key={fIdx} className={cn("p-1", fIdx > 0 && "mt-4 pt-4 border-t border-slate-200")}>
+                            {group.formations.length > 1 && (
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="px-1.5 py-0.5 bg-primary-light text-primary text-[9px] font-bold rounded uppercase">
+                                  Formation {fIdx + 1}/{group.formations.length}
+                                </span>
+                                <span className="text-[9px] text-slate-400 font-bold uppercase">ID: {f.etablissement.slice(0,3)}...</span>
+                              </div>
+                            )}
                             <div className="flex items-start gap-2 mb-1">
-                              <div className="w-2 h-2 rounded-full mt-1.5 shrink-0 bg-primary" />
+                              <div className="w-2 h-2 rounded-full mt-1.5 shrink-0" style={{ backgroundColor: getFormationColor(f.filiere_generale) }} />
                               <h4 className="font-bold text-slate-900 text-sm">{f.etablissement}</h4>
                             </div>
                             <p className="text-xs text-slate-500 mb-1 leading-relaxed">{f.filiere_formation}</p>
@@ -606,13 +702,16 @@ export default function ProPage({ onBack }: ProPageProps) {
                                 </span>
                               </div>
                               <div className="bg-slate-50 p-2 rounded-lg">
-                                <span className="block text-[10px] text-slate-400 uppercase font-bold">% Bac Pro</span>
-                                <span className="text-sm font-bold text-slate-700">{f.pct_admis_neo_pro}%</span>
+                                <span className="block text-[10px] text-slate-400 uppercase font-bold">Capacité</span>
+                                <span className="text-sm font-bold text-slate-700">{f.capacite}</span>
                               </div>
                             </div>
                             
-                            {f.lien_parcoursup && (
-                              <div className="mt-2 pt-2 border-t border-slate-100">
+                            <div className="mt-2 pt-2 border-t border-slate-100 flex flex-col gap-2">
+                              <span className="text-[10px] text-slate-400 font-medium italic leading-tight block">
+                                % Bac Pro admis: {f.pct_admis_neo_pro}%
+                              </span>
+                              {f.lien_parcoursup && (
                                 <a 
                                   href={f.lien_parcoursup} 
                                   target="_blank" 
@@ -621,8 +720,8 @@ export default function ProPage({ onBack }: ProPageProps) {
                                 >
                                   Voir sur Parcoursup <ArrowRight className="w-3 h-3" />
                                 </a>
-                              </div>
-                            )}
+                              )}
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -640,7 +739,63 @@ export default function ProPage({ onBack }: ProPageProps) {
             </div>
 
             <div className="p-8 border-t border-slate-100 bg-slate-50/30 rounded-b-3xl">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="space-y-1.5 relative">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <Search className="w-3 h-3" /> Type de formation
+                  </label>
+                  <div className="relative">
+                    <button 
+                      onClick={() => setShowFormationSuggestions(!showFormationSuggestions)}
+                      className="w-full text-sm font-bold text-slate-700 bg-white border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none shadow-sm flex items-center justify-between"
+                    >
+                      <span className="truncate">
+                        {geoFilter.formationTypes.length === 0 
+                          ? "Aucune sélectionnée" 
+                          : `${geoFilter.formationTypes.length} sélectionnée(s)`}
+                      </span>
+                      <ChevronDown className={cn("w-4 h-4 transition-transform", showFormationSuggestions && "rotate-180")} />
+                    </button>
+                    
+                    {showFormationSuggestions && (
+                      <>
+                        <div className="fixed inset-0 z-10" onClick={() => setShowFormationSuggestions(false)} />
+                        <div className="absolute bottom-full mb-1 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-xl z-20 max-h-64 overflow-y-auto custom-scrollbar p-2 space-y-1">
+                          {allFormationTypes.map((type, i) => {
+                            const isSelected = geoFilter.formationTypes.includes(type);
+                            const color = getFormationColor(type);
+                            return (
+                              <label 
+                                key={i} 
+                                className={cn(
+                                  "flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors",
+                                  isSelected ? "bg-slate-50" : "hover:bg-slate-50/50"
+                                )}
+                              >
+                                <input 
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => {
+                                    setGeoFilter(prev => ({
+                                      ...prev,
+                                      formationTypes: isSelected 
+                                        ? prev.formationTypes.filter(t => t !== type)
+                                        : [...prev.formationTypes, type]
+                                    }));
+                                  }}
+                                  className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary"
+                                />
+                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
+                                <span className="text-sm text-slate-600 font-medium">{type}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
                 <div className="space-y-1.5 relative">
                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
                     <Building2 className="w-3 h-3" /> Ville
