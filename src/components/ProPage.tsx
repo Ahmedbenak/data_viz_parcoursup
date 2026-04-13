@@ -302,11 +302,10 @@ export default function ProPage({ onBack }: ProPageProps) {
   }, []);
 
   const filteredMapData = useMemo(() => {
+    if (geoFilter.formationTypes.length === 0) return [];
+    
     let base = [...mapData];
-
-    if (geoFilter.formationTypes.length > 0) {
-      base = base.filter(f => geoFilter.formationTypes.includes(f.filiere_generale));
-    }
+    base = base.filter(f => geoFilter.formationTypes.includes(f.filiere_generale));
 
     if (geoFilter.city) {
       base = base.filter(f => f.commune.toLowerCase().includes(geoFilter.city.toLowerCase()));
@@ -433,84 +432,31 @@ export default function ProPage({ onBack }: ProPageProps) {
             title="Poursuite d'études"
             value={`${stats.avgStudies}%`}
             icon={<GraduationCap className="w-6 h-6 text-blue-500" />}
-            description="Taux moyen de poursuite"
+            description={`${stats.avgStudies}% des diplômés choisissent de continuer leurs études.`}
             color="blue"
           />
           <KPICard 
             title="Formations analysées"
             value={stats.totalFormations.toString()}
             icon={<Users className="w-6 h-6 text-amber-500" />}
-            description="Spécialités différentes"
+            description="Nombre de spécialités de Bac Pro suivies dans cette analyse."
             color="amber"
           />
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          {/* Trajectory Chart */}
-          <ChartContainer title="Trajectoire d'insertion professionnelle" icon={<TrendingUp className="w-5 h-5" />}>
-            <div className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={trajectoryData}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} unit="%" />
-                  <Tooltip 
-                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                    formatter={(value: number) => [`${value}%`, "Taux d'emploi"]}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="value" 
-                    stroke="#3b82f6" 
-                    strokeWidth={4} 
-                    dot={{ r: 6, fill: '#3b82f6', strokeWidth: 2, stroke: '#fff' }}
-                    activeDot={{ r: 8, strokeWidth: 0 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-            <p className="text-xs text-slate-400 mt-4 italic">
-              Évolution du taux d'emploi de 6 à 24 mois après l'obtention du diplôme.
-            </p>
-          </ChartContainer>
-
-          {/* Outcome Pie Chart */}
-          <ChartContainer title="Devenir des diplômés (à 6 mois)" icon={<PieChartIcon className="w-5 h-5" />}>
-            <div className="h-[300px] w-full flex items-center justify-center">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={outcomeData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={100}
-                    paddingAngle={5}
-                    dataKey="value"
-                  >
-                    {outcomeData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip 
-                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                    formatter={(value: number) => [`${value}%`, "Part"]}
-                  />
-                  <Legend verticalAlign="bottom" height={36}/>
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </ChartContainer>
         </div>
 
         <div className="grid grid-cols-1 gap-8 mb-8">
           {/* Top Formations */}
           <ChartContainer title="Top 10 des formations par taux d'emploi" icon={<BarChart3 className="w-5 h-5" />}>
+            <div className="mb-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+              <p className="text-sm text-slate-600 leading-relaxed">
+                Ce graphique présente les 10 spécialités de <strong>Bac Pro</strong> qui offrent les meilleurs débouchés immédiats sur le marché du travail (taux d'emploi à 6 mois après l'obtention du diplôme).
+              </p>
+            </div>
             <div className="h-[400px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={topFormations} layout="vertical" margin={{ left: 40, right: 40 }}>
+                <BarChart data={topFormations} layout="vertical" margin={{ left: 40, right: 40, bottom: 20 }}>
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
-                  <XAxis type="number" hide />
+                  <XAxis type="number" domain={[0, 100]} tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} tickLine={false} unit="%" />
                   <YAxis 
                     dataKey="name" 
                     type="category" 
