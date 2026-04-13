@@ -19,7 +19,8 @@ import {
   Navigation,
   ChevronDown,
   ArrowRight,
-  Building2
+  Building2,
+  X
 } from 'lucide-react';
 import { 
   LineChart, 
@@ -126,6 +127,9 @@ export default function ProPage({ onBack, onboardingData }: ProPageProps) {
   const [error, setError] = useState<string | null>(null);
   
   // Data states
+  const [rawFineData, setRawFineData] = useState<any[]>([]);
+  const [rawEvolData, setRawEvolData] = useState<any[]>([]);
+  const [proData, setProData] = useState<any[]>([]);
   const [trajectoryData, setTrajectoryData] = useState<any[]>([]);
   const [outcomeData, setOutcomeData] = useState<any[]>([]);
   const [topFormations, setTopFormations] = useState<any[]>([]);
@@ -135,6 +139,11 @@ export default function ProPage({ onBack, onboardingData }: ProPageProps) {
     avgStudies: 0,
     totalFormations: 0
   });
+
+  // Bac Pro Selection states
+  const [selectedBacPro, setSelectedBacPro] = useState<string>('');
+  const [allBacPros, setAllBacPros] = useState<string[]>([]);
+  const [showBacProSuggestions, setShowBacProSuggestions] = useState(false);
 
   // Map states
   const [mapData, setMapData] = useState<any[]>([]);
@@ -190,83 +199,21 @@ export default function ProPage({ onBack, onboardingData }: ProPageProps) {
         if (fineError) throw fineError;
 
         if (fineData && fineData.length > 0) {
-          // Calculate Trajectory
-          const trajectory = [
-            { name: '6 mois', value: calculateAvg(fineData, 'taux_emploi_6mois') },
-            { name: '12 mois', value: calculateAvg(fineData, 'taux_emploi_12mois') },
-            { name: '18 mois', value: calculateAvg(fineData, 'taux_emploi_18mois') },
-            { name: '24 mois', value: calculateAvg(fineData, 'taux_emploi_24mois') },
-          ].filter(d => d.value !== null);
-          setTrajectoryData(trajectory);
-
-          // Calculate Outcomes
-          const outcomes = [
-            { name: 'Emploi', value: calculateAvg(fineData, 'devenir_part_emploi_6mois') },
-            { name: 'Études', value: calculateAvg(fineData, 'devenir_part_poursuite_etudes') },
-            { name: 'Autre', value: calculateAvg(fineData, 'devenir_part_autre_situation_6mois') },
-          ].filter(d => d.value !== null);
-          setOutcomeData(outcomes);
-
-          // Top Formations
-          const formationGroups: { [key: string]: { sum: number, count: number } } = {};
-          fineData.forEach(item => {
-            const val = parseNumeric(item.taux_emploi_6mois);
-            if (val !== null && item.libelle_formation) {
-              const name = item.libelle_formation.charAt(0).toUpperCase() + item.libelle_formation.slice(1);
-              if (!formationGroups[name]) formationGroups[name] = { sum: 0, count: 0 };
-              formationGroups[name].sum += val;
-              formationGroups[name].count += 1;
-            }
-          });
-
-          const top = Object.entries(formationGroups)
-            .map(([name, data]) => ({
-              name,
-              value: Math.round((data.sum / data.count) * 10) / 10
-            }))
-            .sort((a, b) => b.value - a.value)
-            .slice(0, 10);
-          setTopFormations(top);
-
-          // Global Stats
-          setStats({
-            avgEmployment: (proData && proData.length > 0) 
-              ? (calculateAvg(proData, 'taux_emploi_6mois') || calculateAvg(fineData, 'taux_emploi_6mois') || 0)
-              : (calculateAvg(fineData, 'taux_emploi_6mois') || 0),
-            avgStudies: (proData && proData.length > 0)
-              ? (calculateAvg(proData, 'devenir_part_poursuite_etudes') || calculateAvg(fineData, 'devenir_part_poursuite_etudes') || 0)
-              : (calculateAvg(fineData, 'devenir_part_poursuite_etudes') || 0),
-            totalFormations: new Set(fineData.map(d => d.libelle_formation)).size
-          });
+          setRawFineData(fineData);
         }
 
         // 3. Fetch Evolution Data
         const { data: evolData, error: evolError } = await supabase
           .from('parcoursup_fine_clean')
-          .select('annee, taux_emploi_6mois')
+          .select('annee, taux_emploi_6mois, libelle_formation')
           .eq('type_diplome', 'BAC PRO');
 
         if (evolData && evolData.length > 0) {
-          const yearOrder = [
-            'cumul 2018-2019', 'cumul 2019-2020', 'cumul 2020-2021',
-            'cumul 2021-2022', 'cumul 2022-2023', 'cumul 2023-2024'
-          ];
-          const yearGroups: { [key: string]: { sum: number, count: number } } = {};
-          evolData.forEach(item => {
-            const val = parseNumeric(item.taux_emploi_6mois);
-            if (val !== null) {
-              if (!yearGroups[item.annee]) yearGroups[item.annee] = { sum: 0, count: 0 };
-              yearGroups[item.annee].sum += val;
-              yearGroups[item.annee].count += 1;
-            }
-          });
-          const evolution = yearOrder
-            .filter(year => yearGroups[year])
-            .map(year => ({
-              name: year.replace('cumul ', ''),
-              value: Math.round((yearGroups[year].sum / yearGroups[year].count) * 10) / 10
-            }));
-          setEvolutionData(evolution);
+          setRawEvolData(evolData);
+        }
+
+        if (proData) {
+          setProData(proData);
         }
 
         // 4. Fetch Map Filter Options (Cities, Departments, Types)
@@ -291,6 +238,19 @@ export default function ProPage({ onBack, onboardingData }: ProPageProps) {
           setAllFormationTypes(Array.from(new Set(typeData.map(f => f.filiere_generale))).filter(Boolean).sort() as string[]);
         }
 
+        // 5. Fetch all unique Bac Pro formations
+        const { data: bacProList, error: bacProError } = await supabase
+          .from('parcoursup_fine_clean')
+          .select('libelle_formation')
+          .eq('type_diplome', 'BAC PRO');
+        
+        if (!bacProError && bacProList) {
+          const uniqueBacPros = Array.from(new Set(bacProList.map(b => b.libelle_formation)))
+            .filter(Boolean)
+            .sort() as string[];
+          setAllBacPros(uniqueBacPros);
+        }
+
       } catch (err: any) {
         console.error('Error fetching Pro data:', err);
         setError("Impossible de charger les données statistiques.");
@@ -301,6 +261,95 @@ export default function ProPage({ onBack, onboardingData }: ProPageProps) {
 
     fetchData();
   }, []);
+
+  // Process data when raw data or selectedBacPro changes
+  useEffect(() => {
+    if (rawFineData.length === 0) return;
+
+    let filteredFine = rawFineData;
+    let filteredEvol = rawEvolData;
+
+    if (selectedBacPro) {
+      filteredFine = rawFineData.filter(d => d.libelle_formation === selectedBacPro);
+      filteredEvol = rawEvolData.filter(d => d.libelle_formation === selectedBacPro);
+    }
+
+    // Calculate Trajectory
+    const trajectory = [
+      { name: '6 mois', value: calculateAvg(filteredFine, 'taux_emploi_6mois') },
+      { name: '12 mois', value: calculateAvg(filteredFine, 'taux_emploi_12mois') },
+      { name: '18 mois', value: calculateAvg(filteredFine, 'taux_emploi_18mois') },
+      { name: '24 mois', value: calculateAvg(filteredFine, 'taux_emploi_24mois') },
+    ].filter(d => d.value !== null);
+    setTrajectoryData(trajectory);
+
+    // Calculate Outcomes
+    const outcomes = [
+      { name: 'Emploi', value: calculateAvg(filteredFine, 'devenir_part_emploi_6mois') },
+      { name: 'Études', value: calculateAvg(filteredFine, 'devenir_part_poursuite_etudes') },
+      { name: 'Autre', value: calculateAvg(filteredFine, 'devenir_part_autre_situation_6mois') },
+    ].filter(d => d.value !== null);
+    setOutcomeData(outcomes);
+
+    // Top Formations (Always show top 10 from all Bac Pros for context, unless selectedBacPro is set)
+    // Actually, if selectedBacPro is set, maybe we show top 10 similar ones? 
+    // For now, let's keep Top 10 as global context if no selection, or just the selection if selected.
+    const formationGroups: { [key: string]: { sum: number, count: number } } = {};
+    const dataForTop = selectedBacPro ? filteredFine : rawFineData;
+    dataForTop.forEach(item => {
+      const val = parseNumeric(item.taux_emploi_6mois);
+      if (val !== null && item.libelle_formation) {
+        const name = item.libelle_formation.charAt(0).toUpperCase() + item.libelle_formation.slice(1);
+        if (!formationGroups[name]) formationGroups[name] = { sum: 0, count: 0 };
+        formationGroups[name].sum += val;
+        formationGroups[name].count += 1;
+      }
+    });
+
+    const top = Object.entries(formationGroups)
+      .map(([name, data]) => ({
+        name,
+        value: Math.round((data.sum / data.count) * 10) / 10
+      }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10);
+    setTopFormations(top);
+
+    // Global Stats
+    setStats({
+      avgEmployment: (proData && proData.length > 0 && !selectedBacPro) 
+        ? (calculateAvg(proData, 'taux_emploi_6mois') || calculateAvg(filteredFine, 'taux_emploi_6mois') || 0)
+        : (calculateAvg(filteredFine, 'taux_emploi_6mois') || 0),
+      avgStudies: (proData && proData.length > 0 && !selectedBacPro)
+        ? (calculateAvg(proData, 'devenir_part_poursuite_etudes') || calculateAvg(filteredFine, 'devenir_part_poursuite_etudes') || 0)
+        : (calculateAvg(filteredFine, 'devenir_part_poursuite_etudes') || 0),
+      totalFormations: selectedBacPro ? 1 : new Set(rawFineData.map(d => d.libelle_formation)).size
+    });
+
+    // Evolution Data
+    if (filteredEvol.length > 0) {
+      const yearOrder = [
+        'cumul 2018-2019', 'cumul 2019-2020', 'cumul 2020-2021',
+        'cumul 2021-2022', 'cumul 2022-2023', 'cumul 2023-2024'
+      ];
+      const yearGroups: { [key: string]: { sum: number, count: number } } = {};
+      filteredEvol.forEach(item => {
+        const val = parseNumeric(item.taux_emploi_6mois);
+        if (val !== null) {
+          if (!yearGroups[item.annee]) yearGroups[item.annee] = { sum: 0, count: 0 };
+          yearGroups[item.annee].sum += val;
+          yearGroups[item.annee].count += 1;
+        }
+      });
+      const evolution = yearOrder
+        .filter(year => yearGroups[year])
+        .map(year => ({
+          name: year.replace('cumul ', ''),
+          value: Math.round((yearGroups[year].sum / yearGroups[year].count) * 10) / 10
+        }));
+      setEvolutionData(evolution);
+    }
+  }, [rawFineData, rawEvolData, proData, selectedBacPro]);
 
   // Reactive Map Data Fetching (Identical to General section)
   useEffect(() => {
@@ -435,6 +484,11 @@ export default function ProPage({ onBack, onboardingData }: ProPageProps) {
     return allDepartments.filter(d => d.toLowerCase().includes(geoFilter.department.toLowerCase())).slice(0, 10);
   }, [allDepartments, geoFilter.department]);
 
+  const filteredBacPros = useMemo(() => {
+    if (!selectedBacPro) return allBacPros.slice(0, 10);
+    return allBacPros.filter(b => b.toLowerCase().includes(selectedBacPro.toLowerCase())).slice(0, 10);
+  }, [allBacPros, selectedBacPro]);
+
   const handleLocateUser = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition((position) => {
@@ -500,37 +554,120 @@ export default function ProPage({ onBack, onboardingData }: ProPageProps) {
       </header>
 
       <main className="max-w-7xl mx-auto px-6 sm:px-10 py-12">
+        {/* Bac Pro Selection Bar */}
+        <div className="mb-12">
+          <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-soft relative z-[60]">
+            <div className="flex flex-col md:flex-row md:items-center gap-6">
+              <div className="flex-1 space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                  <Search className="w-3 h-3" /> Ma formation actuelle (Bac Pro)
+                </label>
+                <div className="relative">
+                  <input 
+                    type="text"
+                    placeholder="Saisis ton Bac Pro (ex: Commerce, AGOrA...)"
+                    value={selectedBacPro}
+                    onChange={(e) => {
+                      setSelectedBacPro(e.target.value);
+                      setShowBacProSuggestions(true);
+                    }}
+                    onFocus={() => setShowBacProSuggestions(true)}
+                    className="w-full text-lg font-bold text-slate-900 bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all placeholder:text-slate-300"
+                  />
+                  {selectedBacPro && (
+                    <button 
+                      onClick={() => {
+                        setSelectedBacPro('');
+                        setShowBacProSuggestions(false);
+                      }}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-slate-600 transition-colors"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  )}
+                </div>
+
+                {showBacProSuggestions && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setShowBacProSuggestions(false)} />
+                    <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-100 rounded-2xl shadow-2xl z-20 max-h-64 overflow-y-auto custom-scrollbar p-2">
+                      {filteredBacPros.length > 0 ? (
+                        <>
+                          <div className="px-4 py-2 text-[10px] font-black text-slate-400 uppercase tracking-wider border-b border-slate-50 mb-1">
+                            Formations disponibles
+                          </div>
+                          {filteredBacPros.map((bp, idx) => (
+                            <button
+                              key={idx}
+                              onClick={() => {
+                                setSelectedBacPro(bp);
+                                setShowBacProSuggestions(false);
+                              }}
+                              className="w-full text-left px-4 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50 hover:text-primary rounded-xl transition-all flex items-center gap-3 group"
+                            >
+                              <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center group-hover:bg-primary-light transition-colors">
+                                <GraduationCap className="w-4 h-4 text-slate-400 group-hover:text-primary" />
+                              </div>
+                              {bp}
+                            </button>
+                          ))}
+                        </>
+                      ) : (
+                        <div className="px-6 py-8 text-center">
+                          <p className="text-sm text-slate-400 font-medium italic">Aucune formation trouvée pour "{selectedBacPro}"</p>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+              <div className="hidden md:block w-px h-12 bg-slate-100" />
+              <div className="flex flex-col justify-center">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Analyse personnalisée</p>
+                <p className="text-sm text-slate-500 font-medium leading-tight max-w-[200px]">
+                  {selectedBacPro 
+                    ? `Données filtrées pour le ${selectedBacPro}`
+                    : "Sélectionne ton Bac Pro pour voir tes perspectives d'avenir."}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
           <KPICard 
             title="Taux d'emploi à 6 mois"
             value={`${stats.avgEmployment}%`}
             icon={<TrendingUp className="w-7 h-7" />}
-            description="Moyenne nationale Bac Pro"
+            description={selectedBacPro ? `Moyenne pour le ${selectedBacPro}` : "Moyenne nationale Bac Pro"}
             color="emerald"
           />
           <KPICard 
             title="Poursuite d'études"
             value={`${stats.avgStudies}%`}
             icon={<GraduationCap className="w-7 h-7" />}
-            description={`${stats.avgStudies}% des diplômés choisissent de continuer leurs études.`}
+            description={selectedBacPro ? `Part des diplômés de ${selectedBacPro} qui continuent.` : `${stats.avgStudies}% des diplômés choisissent de continuer leurs études.`}
             color="blue"
           />
           <KPICard 
             title="Formations analysées"
             value={stats.totalFormations.toString()}
             icon={<Users className="w-7 h-7" />}
-            description="Nombre de spécialités de Bac Pro suivies dans cette analyse."
+            description={selectedBacPro ? "Données spécifiques à cette spécialité." : "Nombre de spécialités de Bac Pro suivies dans cette analyse."}
             color="amber"
           />
         </div>
 
         <div className="grid grid-cols-1 gap-12 mb-12">
           {/* Top Formations */}
-          <ChartContainer title="Top 10 des formations par taux d'emploi" icon={<BarChart3 className="w-6 h-6" />}>
+          <ChartContainer title={selectedBacPro ? `Statistiques pour : ${selectedBacPro}` : "Top 10 des formations par taux d'emploi"} icon={<BarChart3 className="w-6 h-6" />}>
             <div className="mb-8 p-6 bg-slate-50 rounded-3xl border border-slate-100">
               <p className="text-sm text-slate-600 leading-relaxed font-medium">
-                Ce graphique présente les 10 spécialités de <strong className="text-slate-900">Bac Pro</strong> qui offrent les meilleurs débouchés immédiats sur le marché du travail (taux d'emploi à 6 mois après l'obtention du diplôme).
+                {selectedBacPro 
+                  ? `Voici les statistiques d'insertion pour le ${selectedBacPro}.`
+                  : `Ce graphique présente les 10 spécialités de Bac Pro qui offrent les meilleurs débouchés immédiats sur le marché du travail (taux d'emploi à 6 mois après l'obtention du diplôme).`
+                }
               </p>
             </div>
             <div className="h-[400px] w-full">
