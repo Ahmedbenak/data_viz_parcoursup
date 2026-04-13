@@ -36,6 +36,7 @@ import OnboardingQuestionnaire, { OnboardingData } from './components/Onboarding
 import StatsPanel from './components/StatsPanel';
 import TrackSelection from './components/TrackSelection';
 import ProPage from './components/ProPage';
+import Sandbox from './components/Sandbox';
 
 // Utility for tailwind classes
 function cn(...inputs: ClassValue[]) {
@@ -166,7 +167,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [onboardingComplete, setOnboardingComplete] = useState(false);
   const [onboardingData, setOnboardingData] = useState<OnboardingData | null>(null);
-  const [bacType, setBacType] = useState<'general' | 'pro' | null>(null);
+  const [bacType, setBacType] = useState<'general' | 'pro' | 'sandbox' | null>(null);
   
   const [searchQuery, setSearchQuery] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -630,7 +631,11 @@ export default function App() {
   }
 
   if (bacType === 'pro') {
-    return <ProPage onBack={() => setBacType(null)} />;
+    return <ProPage onBack={() => setBacType(null)} onboardingData={onboardingData} />;
+  }
+
+  if (bacType === 'sandbox') {
+    return <Sandbox onBack={() => setBacType(null)} genData={data} proData={mapSpecificData} />;
   }
 
   if (!onboardingComplete) {

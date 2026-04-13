@@ -50,6 +50,10 @@ import { getSupabase } from '../lib/supabase';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
+import StatsPanel from './StatsPanel';
+
+import { OnboardingData } from './OnboardingQuestionnaire';
+
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
@@ -112,11 +116,12 @@ function MapUpdater({ center }: { center: [number, number] }) {
 
 interface ProPageProps {
   onBack: () => void;
+  onboardingData?: OnboardingData | null;
 }
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
-export default function ProPage({ onBack }: ProPageProps) {
+export default function ProPage({ onBack, onboardingData }: ProPageProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -264,30 +269,26 @@ export default function ProPage({ onBack }: ProPageProps) {
           setEvolutionData(evolution);
         }
 
-        // 4. Fetch Map Data (Formations that admit Bac Pro students)
-        const { data: mapRawData, error: mapError } = await supabase
+        // 4. Fetch Map Filter Options (Cities, Departments, Types)
+        const { data: cityData, error: cityError } = await supabase
           .from('parcoursup_2')
-          .select('*')
-          .gt('pct_admis_neo_pro', 0)
-          .limit(1000);
+          .select('commune');
+        if (!cityError && cityData) {
+          setAllCities(Array.from(new Set(cityData.map(f => f.commune))).filter(Boolean).sort() as string[]);
+        }
 
-        if (!mapError && mapRawData) {
-          const processedMapData = mapRawData.map(f => {
-            const coords = f.coordonnees_gps.split(',').map((c: string) => parseFloat(c.trim()));
-            return {
-              ...f,
-              position: (coords.length === 2 && !isNaN(coords[0]) && !isNaN(coords[1])) ? coords as [number, number] : null
-            };
-          }).filter(f => f.position !== null);
-          setMapData(processedMapData);
+        const { data: deptData, error: deptError } = await supabase
+          .from('parcoursup_2')
+          .select('departement');
+        if (!deptError && deptData) {
+          setAllDepartments(Array.from(new Set(deptData.map(f => f.departement))).filter(Boolean).sort() as string[]);
+        }
 
-          // Extract cities and departments
-          const cities = Array.from(new Set(mapRawData.map(f => f.commune))).filter(Boolean).sort() as string[];
-          const depts = Array.from(new Set(mapRawData.map(f => f.departement))).filter(Boolean).sort() as string[];
-          const types = Array.from(new Set(mapRawData.map(f => f.filiere_generale))).filter(Boolean).sort() as string[];
-          setAllCities(cities);
-          setAllDepartments(depts);
-          setAllFormationTypes(types);
+        const { data: typeData, error: typeError } = await supabase
+          .from('parcoursup_2')
+          .select('filiere_generale');
+        if (!typeError && typeData) {
+          setAllFormationTypes(Array.from(new Set(typeData.map(f => f.filiere_generale))).filter(Boolean).sort() as string[]);
         }
 
       } catch (err: any) {
@@ -300,6 +301,84 @@ export default function ProPage({ onBack }: ProPageProps) {
 
     fetchData();
   }, []);
+
+  // Reactive Map Data Fetching (Identical to General section)
+  useEffect(() => {
+    const loadMapData = async () => {
+      if (geoFilter.formationTypes.length === 0) {
+        setMapData([]);
+        return;
+      }
+      
+      try {
+        const supabase = getSupabase();
+        let allP2Data: any[] = [];
+        let from = 0;
+        const PAGE_SIZE = 1000;
+        let hasMore = true;
+
+        while (hasMore) {
+          const { data, error } = await supabase
+            .from('parcoursup_2')
+            .select('*')
+            .in('filiere_generale', geoFilter.formationTypes)
+            .range(from, from + PAGE_SIZE - 1);
+          
+          if (error) throw error;
+          if (data && data.length > 0) {
+            allP2Data = [...allP2Data, ...data];
+            if (data.length < PAGE_SIZE) {
+              hasMore = false;
+            } else {
+              from += PAGE_SIZE;
+            }
+          } else {
+            hasMore = false;
+          }
+        }
+
+        if (allP2Data.length > 0) {
+          const processedMapData = allP2Data.map(row => {
+            const coords = (row.coordonnees_gps || "").split(',').map((c: string) => parseFloat(c.trim()));
+            return {
+              filiere_generale: row.filiere_generale || "",
+              filiere_formation: row.filiere_formation || "",
+              etablissement: row.etablissement || "",
+              commune: row.commune || "",
+              departement: row.departement || "",
+              region: row.region || "",
+              coordonnees_gps: row.coordonnees_gps || "",
+              eff_admis: Number(row.eff_admis || 0),
+              eff_admis_neo: Number(row.eff_admis_neo || 0),
+              capacite: Number(row.capacite || 0),
+              taux_acces: (row.taux_acces === "nd" || row.taux_acces === null || row.taux_acces === "") ? null : parseFloat(row.taux_acces),
+              note_moyenne: (row.note_moyenne === null || row.note_moyenne === "" || isNaN(Number(row.note_moyenne))) ? null : Number(row.note_moyenne),
+              selectivite: row.selectivite || "",
+              pct_admis_neo_gen: Number(row["pct_admis_neo_gen"] || 0),
+              pct_admis_neo_techno: Number(row["pct_admis_neo_techno"] || 0),
+              pct_admis_neo_pro: Number(row["pct_admis_neo_pro"] || 0),
+              lien_parcoursup: row.lien_parcoursup || "",
+              pct_boursiers: Number(row.pct_boursiers || 0),
+              pct_admis_neo_boursiers: Number(row.pct_admis_neo_boursiers || 0),
+              eff_admis_boursiers_neo: Number(row.eff_admis_boursiers_neo || 0),
+              pct_admises_filles: Number(row.pct_admises_filles || 0),
+              pct_admis_neo_sans_mention: Number(row.pct_admis_neo_sans_mention || 0),
+              pct_admis_neo_mention_ab: Number(row.pct_admis_neo_mention_ab || 0),
+              pct_admis_neo_mention_b: Number(row.pct_admis_neo_mention_b || 0),
+              pct_admis_neo_mention_tb: Number(row.pct_admis_neo_mention_tb || 0),
+              pct_admis_neo_mention_tbf: Number(row.pct_admis_neo_mention_tbf || 0),
+              position: (coords.length === 2 && !isNaN(coords[0]) && !isNaN(coords[1])) ? coords as [number, number] : null
+            };
+          }).filter(f => f.position !== null);
+          setMapData(processedMapData);
+        }
+      } catch (err) {
+        console.error("Error loading map data:", err);
+      }
+    };
+    
+    loadMapData();
+  }, [geoFilter.formationTypes]);
 
   const filteredMapData = useMemo(() => {
     if (geoFilter.formationTypes.length === 0) return [];
@@ -397,59 +476,61 @@ export default function ProPage({ onBack }: ProPageProps) {
   return (
     <div className="min-h-screen bg-slate-50 pb-20">
       {/* Header */}
-      <header className="bg-primary sticky top-0 z-50 shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <svg viewBox="0 0 160 40" className="h-9 w-auto fill-white" xmlns="http://www.w3.org/2000/svg">
-              <text x="0" y="32" fontFamily="Arial, sans-serif" fontWeight="900" fontStyle="italic" fontSize="28" fill="white">l'Étudiant</text>
+      <header className="bg-primary sticky top-0 z-50 shadow-soft">
+        <div className="max-w-7xl mx-auto px-6 sm:px-10 h-20 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <svg viewBox="0 0 160 40" className="h-10 w-auto fill-white" xmlns="http://www.w3.org/2000/svg">
+              <text x="0" y="32" fontFamily="Inter, sans-serif" fontWeight="900" fontStyle="italic" fontSize="28" fill="white">l'Étudiant</text>
             </svg>
           </div>
           
           <div className="flex items-center gap-4">
-            <button 
+            <motion.button 
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
               onClick={onBack}
-              className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl border border-white/20 transition-all text-sm font-bold shadow-sm"
+              className="flex items-center gap-3 px-6 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-2xl border border-white/20 transition-all text-sm font-black shadow-sm backdrop-blur-md"
             >
               <Users className="w-4 h-4" />
-              <span className="hidden sm:inline">Modifier mon profil</span>
+              <span className="hidden sm:inline uppercase tracking-widest">Modifier mon profil</span>
               <span className="sm:hidden">Profil</span>
-            </button>
+            </motion.button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-6 sm:px-10 py-12">
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
           <KPICard 
             title="Taux d'emploi à 6 mois"
             value={`${stats.avgEmployment}%`}
-            icon={<TrendingUp className="w-6 h-6 text-emerald-500" />}
+            icon={<TrendingUp className="w-7 h-7" />}
             description="Moyenne nationale Bac Pro"
             color="emerald"
           />
           <KPICard 
             title="Poursuite d'études"
             value={`${stats.avgStudies}%`}
-            icon={<GraduationCap className="w-6 h-6 text-blue-500" />}
+            icon={<GraduationCap className="w-7 h-7" />}
             description={`${stats.avgStudies}% des diplômés choisissent de continuer leurs études.`}
             color="blue"
           />
           <KPICard 
             title="Formations analysées"
             value={stats.totalFormations.toString()}
-            icon={<Users className="w-6 h-6 text-amber-500" />}
+            icon={<Users className="w-7 h-7" />}
             description="Nombre de spécialités de Bac Pro suivies dans cette analyse."
             color="amber"
           />
         </div>
 
-        <div className="grid grid-cols-1 gap-8 mb-8">
+        <div className="grid grid-cols-1 gap-12 mb-12">
           {/* Top Formations */}
-          <ChartContainer title="Top 10 des formations par taux d'emploi" icon={<BarChart3 className="w-5 h-5" />}>
-            <div className="mb-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
-              <p className="text-sm text-slate-600 leading-relaxed">
-                Ce graphique présente les 10 spécialités de <strong>Bac Pro</strong> qui offrent les meilleurs débouchés immédiats sur le marché du travail (taux d'emploi à 6 mois après l'obtention du diplôme).
+          <ChartContainer title="Top 10 des formations par taux d'emploi" icon={<BarChart3 className="w-6 h-6" />}>
+            <div className="mb-8 p-6 bg-slate-50 rounded-3xl border border-slate-100">
+              <p className="text-sm text-slate-600 leading-relaxed font-medium">
+                Ce graphique présente les 10 spécialités de <strong className="text-slate-900">Bac Pro</strong> qui offrent les meilleurs débouchés immédiats sur le marché du travail (taux d'emploi à 6 mois après l'obtention du diplôme).
               </p>
             </div>
             <div className="h-[400px] w-full">
@@ -467,7 +548,7 @@ export default function ProPage({ onBack }: ProPageProps) {
                   />
                   <Tooltip 
                     contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                    formatter={(value: number) => [`${value}%`, "Taux d'emploi"]}
+                    formatter={(value: number) => [`${value.toFixed(1)}%`, "Taux d'emploi"]}
                   />
                   <Bar dataKey="value" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={20}>
                     {topFormations.map((entry, index) => (
@@ -491,10 +572,10 @@ export default function ProPage({ onBack }: ProPageProps) {
                   <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} unit="%" domain={['auto', 'auto']} />
                   <Tooltip 
                     contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                    formatter={(value: number) => [`${value}%`, "Taux d'emploi"]}
+                    formatter={(value: number) => [`${value.toFixed(1)}%`, "Taux d'emploi"]}
                   />
                   <Line 
-                    type="stepAfter" 
+                    type="monotone" 
                     dataKey="value" 
                     stroke="#8b5cf6" 
                     strokeWidth={3} 
@@ -525,7 +606,7 @@ export default function ProPage({ onBack }: ProPageProps) {
                   </Pie>
                   <Tooltip 
                     contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                    formatter={(value: number) => [`${value}%`, "Part"]}
+                    formatter={(value: number) => [`${value.toFixed(1)}%`, "Part"]}
                   />
                   <Legend verticalAlign="bottom" height={36}/>
                 </PieChart>
@@ -654,6 +735,12 @@ export default function ProPage({ onBack }: ProPageProps) {
                             </div>
                             
                             <div className="mt-2 pt-2 border-t border-slate-100 flex flex-col gap-2">
+                              <span className="text-[10px] text-slate-400 font-medium italic leading-tight block">
+                                Note moyenne au bac pour les admis: {f.note_moyenne !== null ? `${f.note_moyenne.toFixed(2)}/20` : "N/A"}
+                              </span>
+                              <span className="text-[10px] text-emerald-600 font-bold block">
+                                Part de boursiers: {f.pct_admis_neo_boursiers !== undefined ? `${f.pct_admis_neo_boursiers}%` : "N/A"}
+                              </span>
                               <span className="text-[10px] text-slate-400 font-medium italic leading-tight block">
                                 % Bac Pro admis: {f.pct_admis_neo_pro}%
                               </span>
@@ -881,6 +968,16 @@ export default function ProPage({ onBack }: ProPageProps) {
           </div>
         </div>
 
+        {/* Stats Panel Section */}
+        {filteredMapData.length > 0 && (
+          <StatsPanel 
+            data={filteredMapData} 
+            userNote={onboardingData ? parseFloat(onboardingData.averageBac) : null}
+            selectedDepartment={geoFilter.department || undefined}
+            allDataOfSameType={mapData}
+          />
+        )}
+
         <div className="grid grid-cols-1 gap-8">
           {/* External Links */}
           <div className="flex flex-col gap-4">
@@ -912,38 +1009,42 @@ export default function ProPage({ onBack }: ProPageProps) {
 
 function KPICard({ title, value, icon, description, color }: { title: string, value: string, icon: React.ReactNode, description: string, color: 'emerald' | 'blue' | 'amber' }) {
   const colors = {
-    emerald: "bg-emerald-50 border-emerald-100",
-    blue: "bg-blue-50 border-blue-100",
-    amber: "bg-amber-50 border-amber-100"
+    emerald: "bg-emerald-50/50 border-emerald-100/50 text-emerald-600",
+    blue: "bg-blue-50/50 border-blue-100/50 text-blue-600",
+    amber: "bg-amber-50/50 border-amber-100/50 text-amber-600"
   };
 
   return (
-    <div className={cn("p-6 rounded-[2rem] border shadow-sm", colors[color])}>
-      <div className="flex items-center justify-between mb-4">
-        <div className="p-3 bg-white rounded-2xl shadow-sm">
+    <motion.div 
+      whileHover={{ y: -5, shadow: "var(--shadow-hover)" }}
+      className={cn("p-8 rounded-[2.5rem] border bg-white shadow-soft transition-all", colors[color])}
+    >
+      <div className="flex items-center justify-between mb-8">
+        <div className={cn("p-4 rounded-2xl shadow-sm bg-white", colors[color])}>
           {icon}
         </div>
       </div>
-      <h4 className="text-slate-500 text-sm font-medium mb-1">{title}</h4>
-      <div className="text-3xl font-black text-slate-900 mb-1">{value}</div>
-      <p className="text-slate-400 text-xs font-medium">{description}</p>
-    </div>
+      <h4 className="text-slate-400 text-xs font-black uppercase tracking-[0.2em] mb-2">{title}</h4>
+      <div className="text-4xl font-black text-slate-900 mb-2 tracking-tighter">{value}</div>
+      <p className="text-slate-500 text-xs font-medium leading-relaxed">{description}</p>
+    </motion.div>
   );
 }
 
 function ChartContainer({ title, icon, children }: { title: string, icon: React.ReactNode, children: React.ReactNode }) {
   return (
     <motion.div 
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 30 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
-      className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm"
+      transition={{ duration: 0.6 }}
+      className="bg-white p-10 md:p-12 rounded-[3.5rem] border border-slate-100 shadow-soft"
     >
-      <div className="flex items-center gap-3 mb-8">
-        <div className="p-2.5 bg-slate-50 rounded-xl text-slate-400">
+      <div className="flex items-center gap-4 mb-12">
+        <div className="p-3 bg-slate-50 rounded-2xl text-slate-400">
           {icon}
         </div>
-        <h3 className="text-lg font-bold text-slate-900">{title}</h3>
+        <h3 className="text-2xl font-black text-slate-900 tracking-tight">{title}</h3>
       </div>
       {children}
     </motion.div>
@@ -952,22 +1053,23 @@ function ChartContainer({ title, icon, children }: { title: string, icon: React.
 
 function ExternalLinkCard({ title, description, url }: { title: string, description: string, url: string }) {
   return (
-    <a 
+    <motion.a 
+      whileHover={{ x: 10, backgroundColor: '#f8fafc' }}
       href={url} 
       target="_blank" 
       rel="noopener noreferrer"
-      className="group p-6 bg-white border border-slate-100 rounded-3xl hover:border-blue-500 hover:shadow-lg hover:shadow-blue-500/5 transition-all flex items-center justify-between"
+      className="group p-8 bg-white border border-slate-100 rounded-[2rem] shadow-soft hover:border-primary/20 transition-all flex items-center justify-between"
     >
       <div className="flex-1">
-        <h4 className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors flex items-center gap-2">
+        <h4 className="text-lg font-black text-slate-900 group-hover:text-primary transition-colors flex items-center gap-3">
           {title}
-          <ExternalLink className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+          <ExternalLink className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0" />
         </h4>
-        <p className="text-sm text-slate-500 line-clamp-1">{description}</p>
+        <p className="text-sm text-slate-500 font-medium mt-1">{description}</p>
       </div>
-      <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center group-hover:bg-blue-50 transition-colors">
-        <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-blue-500 transition-colors" />
+      <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center group-hover:bg-primary-light transition-colors">
+        <ChevronRight className="w-6 h-6 text-slate-300 group-hover:text-primary transition-colors" />
       </div>
-    </a>
+    </motion.a>
   );
 }
