@@ -564,10 +564,7 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
     }
 
     if (geoFilter.department) {
-      base = base.filter(f => 
-        f.departement.toLowerCase().includes(geoFilter.department.toLowerCase()) ||
-        (f.departement.match(/\(([^)]+)\)/)?.[1] || "").includes(geoFilter.department)
-      );
+      base = base.filter(f => f.departement.toLowerCase() === geoFilter.department.toLowerCase());
     }
 
     if (geoFilter.radius < 1000) {

@@ -581,12 +581,9 @@ export default function App() {
       base = base.filter(f => f.commune.toLowerCase().includes(geoFilter.city.toLowerCase()));
     }
 
-    // Filter by Department
+    // Filter by Department (Exact match to avoid partial matches like "Ain" in "Ille-et-Vilaine")
     if (geoFilter.department) {
-      base = base.filter(f => 
-        f.departement.toLowerCase().includes(geoFilter.department.toLowerCase()) ||
-        (f.departement.match(/\(([^)]+)\)/)?.[1] || "").includes(geoFilter.department)
-      );
+      base = base.filter(f => f.departement.toLowerCase() === geoFilter.department.toLowerCase());
     }
 
     const mapped = base.map(f => {
