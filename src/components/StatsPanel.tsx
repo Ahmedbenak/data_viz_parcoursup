@@ -90,13 +90,23 @@ interface StatsPanelProps {
 
 export default function StatsPanel({ data, userNote, selectedDepartment, allDataOfSameType }: StatsPanelProps) {
   const [localUserNote, setLocalUserNote] = useState<number | null>(userNote || null);
+  const [inputValue, setInputValue] = useState<string>(userNote ? userNote.toString() : '');
 
   // Sync with prop if it changes from outside
   useEffect(() => {
     if (userNote !== undefined) {
       setLocalUserNote(userNote);
+      setInputValue(userNote ? userNote.toString() : '');
     }
   }, [userNote]);
+
+  const handleValidate = () => {
+    const sanitized = inputValue.replace(',', '.');
+    const val = parseFloat(sanitized);
+    if (!isNaN(val) && val >= 0 && val <= 20) {
+      setLocalUserNote(val);
+    }
+  };
 
   // Filter out NaN note_moyenne
   const validData = useMemo(() => data.filter(d => d.note_moyenne !== null), [data]);
@@ -267,8 +277,8 @@ export default function StatsPanel({ data, userNote, selectedDepartment, allData
             <TrendingUp className="w-8 h-8 text-primary" />
           </div>
           <div>
-            <h3 className="text-4xl font-black text-slate-900 tracking-tight leading-tight">Analyse Statistique</h3>
-            <p className="text-slate-500 font-medium text-lg">Décryptage de ton profil et des opportunités</p>
+            <h3 className="text-4xl md:text-6xl font-black text-slate-900 tracking-tight leading-tight">Analyse <span className="text-primary">Statistique</span></h3>
+            <p className="text-slate-500 font-medium text-xl">Décryptage de ton profil et des opportunités</p>
           </div>
         </div>
       </div>
@@ -276,8 +286,11 @@ export default function StatsPanel({ data, userNote, selectedDepartment, allData
       {/* Overview Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
         <motion.div 
-          whileHover={{ y: -5 }}
-          className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-soft"
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          whileHover={{ y: -10, shadow: "var(--shadow-hover)" }}
+          className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-soft transition-all"
         >
           <div className="flex items-center gap-4 mb-6">
             <div className="p-3 bg-blue-50 rounded-2xl text-blue-600">
@@ -290,8 +303,12 @@ export default function StatsPanel({ data, userNote, selectedDepartment, allData
         </motion.div>
 
         <motion.div 
-          whileHover={{ y: -5 }}
-          className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-soft"
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.1 }}
+          whileHover={{ y: -10, shadow: "var(--shadow-hover)" }}
+          className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-soft transition-all"
         >
           <div className="flex items-center gap-4 mb-6">
             <div className="p-3 bg-emerald-50 rounded-2xl text-emerald-600">
@@ -304,8 +321,12 @@ export default function StatsPanel({ data, userNote, selectedDepartment, allData
         </motion.div>
 
         <motion.div 
-          whileHover={{ y: -5 }}
-          className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-soft sm:col-span-2 lg:col-span-1"
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.2 }}
+          whileHover={{ y: -10, shadow: "var(--shadow-hover)" }}
+          className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-soft sm:col-span-2 lg:col-span-1 transition-all"
         >
           <div className="flex items-center gap-4 mb-6">
             <div className="p-3 bg-purple-50 rounded-2xl text-purple-600">
@@ -401,23 +422,27 @@ export default function StatsPanel({ data, userNote, selectedDepartment, allData
                 <p className="text-sm text-slate-500 font-medium mb-8 leading-relaxed">
                   Saisis ta moyenne pour débloquer l'analyse prédictive de tes chances d'admission.
                 </p>
-                <div className="flex items-center justify-center gap-4 bg-slate-50 p-6 rounded-[2rem] border border-slate-100 mb-6">
-                  <input 
-                    type="number" 
-                    min="0" 
-                    max="20" 
-                    step="0.1"
-                    placeholder="--"
-                    autoFocus
-                    onChange={(e) => {
-                      const val = parseFloat(e.target.value);
-                      if (!isNaN(val) && val >= 0 && val <= 20) {
-                        setLocalUserNote(val);
-                      }
-                    }}
-                    className="w-24 bg-white border-2 border-slate-100 p-3 rounded-2xl text-3xl font-black text-primary text-center focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none transition-all"
-                  />
-                  <span className="text-slate-300 font-black text-2xl">/ 20</span>
+                <div className="flex flex-col gap-4 items-center justify-center bg-slate-50 p-8 rounded-[2.5rem] border border-slate-100 mb-6">
+                  <div className="flex items-center gap-4">
+                    <input 
+                      type="text" 
+                      inputMode="decimal"
+                      placeholder="--"
+                      autoFocus
+                      value={inputValue}
+                      onChange={(e) => setInputValue(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleValidate()}
+                      className="w-24 bg-white border-2 border-slate-100 p-3 rounded-2xl text-3xl font-black text-primary text-center focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none transition-all"
+                    />
+                    <span className="text-slate-300 font-black text-2xl">/ 20</span>
+                  </div>
+                  <button 
+                    onClick={handleValidate}
+                    disabled={!inputValue || isNaN(parseFloat(inputValue.replace(',', '.')))}
+                    className="w-full py-3 bg-primary text-white rounded-xl font-bold hover:bg-primary-hover transition-all shadow-lg shadow-primary/20 disabled:opacity-50 disabled:shadow-none"
+                  >
+                    Valider ma note
+                  </button>
                 </div>
               </motion.div>
             </div>
@@ -437,15 +462,12 @@ export default function StatsPanel({ data, userNote, selectedDepartment, allData
                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Ta Note</span>
                     <div className="flex items-center gap-2">
                       <input 
-                        type="number" 
-                        min="0" 
-                        max="20" 
-                        step="0.1"
-                        value={localUserNote || ''}
-                        onChange={(e) => {
-                          const val = parseFloat(e.target.value);
-                          setLocalUserNote(isNaN(val) ? null : val);
-                        }}
+                        type="text" 
+                        inputMode="decimal"
+                        value={inputValue}
+                        onChange={(e) => setInputValue(e.target.value)}
+                        onBlur={handleValidate}
+                        onKeyDown={(e) => e.key === 'Enter' && handleValidate()}
                         className="w-14 bg-transparent border-none p-0 text-2xl font-black text-primary focus:ring-0"
                       />
                       <span className="text-slate-300 font-black text-lg">/ 20</span>

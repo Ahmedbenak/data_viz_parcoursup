@@ -37,6 +37,8 @@ import OnboardingQuestionnaire, { OnboardingData } from './components/Onboarding
 import StatsPanel from './components/StatsPanel';
 import TrackSelection from './components/TrackSelection';
 import ProPage from './components/ProPage';
+import { Skeleton, CardSkeleton, TableSkeleton } from './components/Skeleton';
+import { motion, AnimatePresence } from 'motion/react';
 
 // Utility for tailwind classes
 function cn(...inputs: ClassValue[]) {
@@ -54,8 +56,8 @@ import {
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
-const createMarkerIcon = (colors: string[]) => {
-  if (colors.length === 1) {
+const createMarkerIcon = (colors: string[], count: number) => {
+  if (count === 1) {
     return L.divIcon({
       className: 'custom-marker',
       html: `<div style="background-color: ${colors[0]}; width: 14px; height: 14px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>`,
@@ -63,12 +65,16 @@ const createMarkerIcon = (colors: string[]) => {
       iconAnchor: [7, 7]
     });
   } else {
-    const gradient = `conic-gradient(${colors.map((c, i) => `${c} ${i * (360/colors.length)}deg ${(i+1) * (360/colors.length)}deg`).join(', ')})`;
+    const gradient = colors.length > 1 
+      ? `conic-gradient(${colors.map((c, i) => `${c} ${i * (360/colors.length)}deg ${(i+1) * (360/colors.length)}deg`).join(', ')})`
+      : colors[0];
+      
+    // Adjusted size for multiple formations (22px) and fixed centering
     return L.divIcon({
       className: 'custom-marker',
-      html: `<div style="background: ${gradient}; width: 18px; height: 18px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>`,
-      iconSize: [18, 18],
-      iconAnchor: [9, 9]
+      html: `<div style="background: ${gradient}; width: 22px; height: 22px; border-radius: 50%; border: 2px solid white; box-shadow: 0 4px 8px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; color: white; font-size: 10px; font-weight: 900; text-shadow: 0 1px 2px rgba(0,0,0,0.6);">${count}</div>`,
+      iconSize: [22, 22],
+      iconAnchor: [11, 11]
     });
   }
 };
@@ -230,131 +236,52 @@ export default function App() {
     }
   };
 
-  // Step 1: Load unique specialties and all formation types
+  // Step 1: Load unique specialties and all formation types using RPC
   const loadInitialData = async () => {
     try {
       setLoading(true);
       setError(null);
       const supabase = getSupabase();
       
-      // Load Specialties
-      const { data: specData, error: specError } = await supabase
-        .from('parcoursup_1')
-        .select('specialites');
+      // Use RPCs for much faster data loading (Server-side DISTINCT)
+      const [
+        { data: specData, error: specError },
+        { data: typeData, error: typeError },
+        { data: cityData, error: cityError },
+        { data: deptData, error: deptError }
+      ] = await Promise.all([
+        supabase.rpc('get_unique_specialties'),
+        supabase.rpc('get_unique_formation_types'),
+        supabase.rpc('get_unique_cities'),
+        supabase.rpc('get_unique_departments')
+      ]);
 
       if (specError) throw specError;
+      if (typeError) throw typeError;
+      if (cityError) throw cityError;
+      if (deptError) throw deptError;
 
       if (specData) {
-        const uniqueSpecs = Array.from(new Set(specData.map(row => row.specialites)))
-          .filter(Boolean)
-          .sort() as string[];
-        
-        setSpecialties(uniqueSpecs);
-        
-        // Extract individual specialties from combinations
+        const specs = specData.map((row: any) => row.spec);
+        setSpecialties(specs);
         const individual = Array.from(new Set(
-          uniqueSpecs.flatMap(s => s.split(', ').map(part => part.trim()))
+          specs.flatMap((s: string) => s.split(', ').map(part => part.trim()))
         )).sort();
         setIndividualSpecialties(individual);
       }
 
-      // Load All Formation Types for the map (Paginated)
-      let allTypeData: any[] = [];
-      let typeFrom = 0;
-      const TYPE_PAGE_SIZE = 1000;
-      let hasMoreType = true;
-
-      while (hasMoreType) {
-        const { data, error } = await supabase
-          .from('parcoursup_2')
-          .select('filiere_generale')
-          .neq('pct_admis_neo_gen', '0')
-          .not('pct_admis_neo_gen', 'is', null)
-          .range(typeFrom, typeFrom + TYPE_PAGE_SIZE - 1);
-        
-        if (error) throw error;
-        if (data && data.length > 0) {
-          allTypeData = [...allTypeData, ...data];
-          if (data.length < TYPE_PAGE_SIZE) {
-            hasMoreType = false;
-          } else {
-            typeFrom += TYPE_PAGE_SIZE;
-          }
-        } else {
-          hasMoreType = false;
-        }
+      if (typeData) {
+        setAllFormationTypes(typeData.map((row: any) => row.filiere));
       }
 
-      if (allTypeData.length > 0) {
-        const uniqueTypes = Array.from(new Set(allTypeData.map(row => row.filiere_generale)))
-          .filter(Boolean)
-          .sort() as string[];
-        setAllFormationTypes(uniqueTypes);
+      if (cityData) {
+        setAllCities(cityData.map((row: any) => row.city));
       }
 
-      // Load All Cities for the map filter (Paginated)
-      let allCityData: any[] = [];
-      let cityFrom = 0;
-      const CITY_PAGE_SIZE = 1000;
-      let hasMoreCity = true;
-
-      while (hasMoreCity) {
-        const { data, error } = await supabase
-          .from('parcoursup_2')
-          .select('commune')
-          .range(cityFrom, cityFrom + CITY_PAGE_SIZE - 1);
-        
-        if (error) throw error;
-        if (data && data.length > 0) {
-          allCityData = [...allCityData, ...data];
-          if (data.length < CITY_PAGE_SIZE) {
-            hasMoreCity = false;
-          } else {
-            cityFrom += CITY_PAGE_SIZE;
-          }
-        } else {
-          hasMoreCity = false;
-        }
+      if (deptData) {
+        setAllDepartments(deptData.map((row: any) => row.dept));
       }
 
-      if (allCityData.length > 0) {
-        const uniqueCities = Array.from(new Set(allCityData.map(row => row.commune)))
-          .filter(Boolean)
-          .sort() as string[];
-        setAllCities(uniqueCities);
-      }
-
-      // Load All Departments for the map filter (Paginated)
-      let allDeptData: any[] = [];
-      let deptFrom = 0;
-      const DEPT_PAGE_SIZE = 1000;
-      let hasMoreDept = true;
-
-      while (hasMoreDept) {
-        const { data, error } = await supabase
-          .from('parcoursup_2')
-          .select('departement')
-          .range(deptFrom, deptFrom + DEPT_PAGE_SIZE - 1);
-        
-        if (error) throw error;
-        if (data && data.length > 0) {
-          allDeptData = [...allDeptData, ...data];
-          if (data.length < DEPT_PAGE_SIZE) {
-            hasMoreDept = false;
-          } else {
-            deptFrom += DEPT_PAGE_SIZE;
-          }
-        } else {
-          hasMoreDept = false;
-        }
-      }
-
-      if (allDeptData.length > 0) {
-        const uniqueDepts = Array.from(new Set(allDeptData.map(row => row.departement)))
-          .filter(Boolean)
-          .sort() as string[];
-        setAllDepartments(uniqueDepts);
-      }
     } catch (err: any) {
       console.error('Error loading initial data:', err);
       setError("Erreur lors du chargement des données initiales.");
@@ -679,10 +606,18 @@ export default function App() {
     return sortConfig.direction === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />;
   };
 
-  if (loading) {
+  if (loading && !bacType) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      <div className="min-h-screen bg-slate-50 p-8 space-y-8">
+        <div className="max-w-7xl mx-auto space-y-8">
+          <Skeleton className="h-16 w-full rounded-2xl" />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <CardSkeleton />
+            <CardSkeleton />
+            <CardSkeleton />
+          </div>
+          <TableSkeleton />
+        </div>
       </div>
     );
   }
@@ -795,15 +730,21 @@ export default function App() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Hero / Selection */}
-        <section className="mb-12 text-center max-w-3xl mx-auto">
-          <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 mb-4">
-            Trouve ta voie après le bac
-          </h2>
-          <p className="text-lg text-slate-600 mb-8">
-            Analyse les statistiques d'admission basées sur tes enseignements de spécialité pour mieux préparer tes vœux Parcoursup.
-          </p>
+        <section className="mb-16 text-center max-w-4xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+          >
+            <h2 className="text-4xl sm:text-6xl font-black text-slate-900 mb-6 tracking-tight leading-[1.1]">
+              Trouve ta voie <span className="text-primary">après le bac</span>
+            </h2>
+            <p className="text-xl text-slate-500 mb-10 font-medium max-w-2xl mx-auto leading-relaxed">
+              Analyse les statistiques d'admission basées sur tes enseignements de spécialité pour mieux préparer tes vœux Parcoursup.
+            </p>
+          </motion.div>
           
-          <div className="relative max-w-xl mx-auto">
+          <div className="relative max-w-2xl mx-auto">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none z-10">
               <Search className="h-5 w-5 text-slate-400" />
             </div>
@@ -818,7 +759,7 @@ export default function App() {
               }}
               onFocus={() => setShowSuggestions(true)}
               className={cn(
-                "block w-full pl-11 pr-10 py-4 text-base border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary sm:text-lg rounded-2xl bg-white shadow-xl shadow-primary-light/50 transition-all",
+                "block w-full pl-12 pr-10 py-5 text-lg border-slate-200 focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary sm:text-xl rounded-3xl bg-white shadow-2xl shadow-primary-light/30 transition-all placeholder:text-slate-400 font-medium",
                 loading && "opacity-50 cursor-not-allowed"
               )}
             />
@@ -1216,7 +1157,7 @@ export default function App() {
                     <Marker 
                       key={idx} 
                       position={group.position}
-                      icon={createMarkerIcon(group.colors)}
+                      icon={createMarkerIcon(group.colors, group.formations.length)}
                     >
                       <Popup minWidth={250} maxWidth={320}>
                         <div className="max-h-[350px] overflow-y-auto pr-1 custom-scrollbar">

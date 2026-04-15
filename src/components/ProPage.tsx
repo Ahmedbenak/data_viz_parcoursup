@@ -72,8 +72,8 @@ let DefaultIcon = L.icon({
 });
 L.Marker.prototype.options.icon = DefaultIcon;
 
-const createMarkerIcon = (colors: string[]) => {
-  if (colors.length === 1) {
+const createMarkerIcon = (colors: string[], count: number) => {
+  if (count === 1) {
     return L.divIcon({
       className: 'custom-marker',
       html: `<div style="background-color: ${colors[0]}; width: 14px; height: 14px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>`,
@@ -81,12 +81,16 @@ const createMarkerIcon = (colors: string[]) => {
       iconAnchor: [7, 7]
     });
   } else {
-    const gradient = `conic-gradient(${colors.map((c, i) => `${c} ${i * (360/colors.length)}deg ${(i+1) * (360/colors.length)}deg`).join(', ')})`;
+    const gradient = colors.length > 1 
+      ? `conic-gradient(${colors.map((c, i) => `${c} ${i * (360/colors.length)}deg ${(i+1) * (360/colors.length)}deg`).join(', ')})`
+      : colors[0];
+      
+    // Adjusted size for multiple formations (22px) and fixed centering
     return L.divIcon({
       className: 'custom-marker',
-      html: `<div style="background: ${gradient}; width: 18px; height: 18px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>`,
-      iconSize: [18, 18],
-      iconAnchor: [9, 9]
+      html: `<div style="background: ${gradient}; width: 22px; height: 22px; border-radius: 50%; border: 2px solid white; box-shadow: 0 4px 8px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; color: white; font-size: 10px; font-weight: 900; text-shadow: 0 1px 2px rgba(0,0,0,0.6);">${count}</div>`,
+      iconSize: [22, 22],
+      iconAnchor: [11, 11]
     });
   }
 };
@@ -115,6 +119,8 @@ function MapUpdater({ center }: { center: [number, number] }) {
   }, [center, map]);
   return null;
 }
+
+import { Skeleton, CardSkeleton, TableSkeleton } from './Skeleton';
 
 interface ProPageProps {
   onBack: () => void;
@@ -184,14 +190,38 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
         const supabase = getSupabase();
         const currentYear = 'cumul 2023-2024';
 
-        // 1. Fetch global stats from parcoursup_pro
-        const { data: proData, error: proError } = await supabase
-          .from('parcoursup_pro')
-          .select('taux_emploi_6mois, devenir_part_poursuite_etudes')
-          .eq('annee', currentYear)
-          .eq('dont_apprentis_eple', 'ensemble');
+        // 1. Parallel fetching using RPCs and optimized queries
+        const [
+          { data: proData, error: proError },
+          { data: cityData, error: cityError },
+          { data: deptData, error: deptError },
+          { data: typeData, error: typeError },
+          { data: bacProListData, error: bacProListError }
+        ] = await Promise.all([
+          supabase
+            .from('parcoursup_pro')
+            .select('taux_emploi_6mois, devenir_part_poursuite_etudes')
+            .eq('annee', currentYear)
+            .eq('dont_apprentis_eple', 'ensemble'),
+          supabase.rpc('get_unique_cities'),
+          supabase.rpc('get_unique_departments'),
+          supabase.rpc('get_unique_formation_types_pro'),
+          supabase.rpc('get_unique_bac_pros')
+        ]);
 
-        // 2. Fetch data for Trajectory and Outcomes (Bac Pro, current year, paginated)
+        if (proError) throw proError;
+        if (cityError) throw cityError;
+        if (deptError) throw deptError;
+        if (typeError) throw typeError;
+        if (bacProListError) throw bacProListError;
+
+        if (proData) setProData(proData);
+        if (cityData) setAllCities(cityData.map((r: any) => r.city));
+        if (deptData) setAllDepartments(deptData.map((r: any) => r.dept));
+        if (typeData) setAllFormationTypes(typeData.map((r: any) => r.filiere));
+        if (bacProListData) setAllBacPros(bacProListData.map((r: any) => r.libelle));
+
+        // 2. Fetch ALL data for Bac Pro (all years) to support both current stats and evolution chart
         let allFineData: any[] = [];
         let fineFrom = 0;
         const FINE_PAGE_SIZE = 1000;
@@ -201,7 +231,6 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
           const { data, error } = await supabase
             .from('parcoursup_fine_clean')
             .select('*')
-            .eq('annee', currentYear)
             .eq('type_diplome', 'BAC PRO')
             .range(fineFrom, fineFrom + FINE_PAGE_SIZE - 1);
           
@@ -219,158 +248,15 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
         }
 
         if (allFineData.length > 0) {
-          setRawFineData(allFineData);
-        }
-
-        // 3. Fetch Evolution Data (Paginated to get all rows)
-        let allEvolData: any[] = [];
-        let evolFrom = 0;
-        const EVOL_PAGE_SIZE = 1000;
-        let hasMoreEvol = true;
-
-        while (hasMoreEvol) {
-          const { data, error } = await supabase
-            .from('parcoursup_fine_clean')
-            .select('annee, taux_emploi_6mois, libelle_formation')
-            .eq('type_diplome', 'BAC PRO')
-            .range(evolFrom, evolFrom + EVOL_PAGE_SIZE - 1);
+          // Current year data for Trajectory and Outcomes
+          setRawFineData(allFineData.filter(d => d.annee === currentYear));
           
-          if (error) throw error;
-          if (data && data.length > 0) {
-            allEvolData = [...allEvolData, ...data];
-            if (data.length < EVOL_PAGE_SIZE) {
-              hasMoreEvol = false;
-            } else {
-              evolFrom += EVOL_PAGE_SIZE;
-            }
-          } else {
-            hasMoreEvol = false;
-          }
-        }
-
-        if (allEvolData.length > 0) {
-          setRawEvolData(allEvolData);
-        }
-
-        if (proData) {
-          setProData(proData);
-        }
-
-        // 4. Fetch Map Filter Options (Cities, Departments, Types - Paginated)
-        let allCityData: any[] = [];
-        let cityFrom = 0;
-        const CITY_PAGE_SIZE = 1000;
-        let hasMoreCity = true;
-
-        while (hasMoreCity) {
-          const { data, error } = await supabase
-            .from('parcoursup_2')
-            .select('commune')
-            .range(cityFrom, cityFrom + CITY_PAGE_SIZE - 1);
-          
-          if (error) throw error;
-          if (data && data.length > 0) {
-            allCityData = [...allCityData, ...data];
-            if (data.length < CITY_PAGE_SIZE) {
-              hasMoreCity = false;
-            } else {
-              cityFrom += CITY_PAGE_SIZE;
-            }
-          } else {
-            hasMoreCity = false;
-          }
-        }
-        if (allCityData.length > 0) {
-          setAllCities(Array.from(new Set(allCityData.map(f => f.commune))).filter(Boolean).sort() as string[]);
-        }
-
-        let allDeptData: any[] = [];
-        let deptFrom = 0;
-        const DEPT_PAGE_SIZE = 1000;
-        let hasMoreDept = true;
-
-        while (hasMoreDept) {
-          const { data, error } = await supabase
-            .from('parcoursup_2')
-            .select('departement')
-            .range(deptFrom, deptFrom + DEPT_PAGE_SIZE - 1);
-          
-          if (error) throw error;
-          if (data && data.length > 0) {
-            allDeptData = [...allDeptData, ...data];
-            if (data.length < DEPT_PAGE_SIZE) {
-              hasMoreDept = false;
-            } else {
-              deptFrom += DEPT_PAGE_SIZE;
-            }
-          } else {
-            hasMoreDept = false;
-          }
-        }
-        if (allDeptData.length > 0) {
-          setAllDepartments(Array.from(new Set(allDeptData.map(f => f.departement))).filter(Boolean).sort() as string[]);
-        }
-
-        let allTypeData: any[] = [];
-        let typeFrom = 0;
-        const TYPE_PAGE_SIZE = 1000;
-        let hasMoreType = true;
-
-        while (hasMoreType) {
-          const { data, error } = await supabase
-            .from('parcoursup_2')
-            .select('filiere_generale')
-            .neq('pct_admis_neo_pro', '0')
-            .not('pct_admis_neo_pro', 'is', null)
-            .range(typeFrom, typeFrom + TYPE_PAGE_SIZE - 1);
-          
-          if (error) throw error;
-          if (data && data.length > 0) {
-            allTypeData = [...allTypeData, ...data];
-            if (data.length < TYPE_PAGE_SIZE) {
-              hasMoreType = false;
-            } else {
-              typeFrom += TYPE_PAGE_SIZE;
-            }
-          } else {
-            hasMoreType = false;
-          }
-        }
-        if (allTypeData.length > 0) {
-          setAllFormationTypes(Array.from(new Set(allTypeData.map(f => f.filiere_generale))).filter(Boolean).sort() as string[]);
-        }
-
-        // 5. Fetch all unique Bac Pro formations (Paginated)
-        let allBacProList: any[] = [];
-        let bFrom = 0;
-        const B_PAGE_SIZE = 1000;
-        let hasMoreB = true;
-
-        while (hasMoreB) {
-          const { data, error } = await supabase
-            .from('parcoursup_fine_clean')
-            .select('libelle_formation')
-            .eq('type_diplome', 'BAC PRO')
-            .range(bFrom, bFrom + B_PAGE_SIZE - 1);
-          
-          if (error) throw error;
-          if (data && data.length > 0) {
-            allBacProList = [...allBacProList, ...data];
-            if (data.length < B_PAGE_SIZE) {
-              hasMoreB = false;
-            } else {
-              bFrom += B_PAGE_SIZE;
-            }
-          } else {
-            hasMoreB = false;
-          }
-        }
-        
-        if (allBacProList.length > 0) {
-          const uniqueBacPros = Array.from(new Set(allBacProList.map(b => b.libelle_formation)))
-            .filter(Boolean)
-            .sort() as string[];
-          setAllBacPros(uniqueBacPros);
+          // All years for the evolution chart
+          setRawEvolData(allFineData.map(d => ({
+            annee: d.annee,
+            taux_emploi_6mois: d.taux_emploi_6mois,
+            libelle_formation: d.libelle_formation
+          })));
         }
 
       } catch (err: any) {
@@ -386,7 +272,7 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
 
   // Process data when raw data or selectedBacPro changes
   useEffect(() => {
-    if (rawFineData.length === 0) return;
+    if (rawFineData.length === 0 && rawEvolData.length === 0) return;
 
     let filteredFine = rawFineData;
     let filteredEvol = rawEvolData;
@@ -639,10 +525,20 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-          <p className="text-slate-500 font-medium animate-pulse">Chargement des données InserJeunes...</p>
+      <div className="min-h-screen bg-slate-50 space-y-8">
+        <Skeleton className="h-16 w-full" />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+          <Skeleton className="h-20 w-full rounded-3xl" />
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <CardSkeleton />
+            <CardSkeleton />
+            <CardSkeleton />
+            <CardSkeleton />
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <Skeleton className="h-[400px] rounded-[3.5rem]" />
+            <Skeleton className="h-[400px] rounded-[3.5rem]" />
+          </div>
         </div>
       </div>
     );
@@ -1052,7 +948,7 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
                   <Marker 
                     key={idx} 
                     position={group.position}
-                    icon={createMarkerIcon(group.colors)}
+                    icon={createMarkerIcon(group.colors, group.formations.length)}
                   >
                     <Popup minWidth={250} maxWidth={320}>
                       <div className="max-h-[350px] overflow-y-auto pr-1 custom-scrollbar">

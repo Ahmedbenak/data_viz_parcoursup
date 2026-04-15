@@ -126,7 +126,7 @@ export default function TrackSelection({ onSelect, onboardingData, setOnboarding
             <GraduationCap className="w-10 h-10 text-primary" />
           </motion.div>
           
-          <h1 className="text-5xl md:text-6xl font-black text-slate-900 mb-6 tracking-tight leading-[1.1]">
+          <h1 className="text-5xl md:text-7xl font-black text-slate-900 mb-6 tracking-tight leading-[1.1]">
             Bienvenue sur <span className="text-primary">l'Étudiant</span>
           </h1>
           <p className="text-slate-500 text-xl font-medium max-w-2xl mx-auto leading-relaxed">
@@ -137,13 +137,13 @@ export default function TrackSelection({ onSelect, onboardingData, setOnboarding
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
           {/* Bac Général */}
           <motion.button
-            whileHover={{ y: -8, shadow: "var(--shadow-hover)" }}
-            whileTap={{ scale: 0.97 }}
+            whileHover={{ y: -12, shadow: "var(--shadow-hover)" }}
+            whileTap={{ scale: 0.98 }}
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3, duration: 0.6 }}
             onClick={() => onSelect('general')}
-            className="group relative p-10 bg-white border border-slate-100 rounded-[2.5rem] shadow-soft hover:border-primary/30 transition-all text-left overflow-hidden"
+            className="group relative p-10 bg-white border border-slate-100 rounded-[3rem] shadow-soft hover:border-primary/30 transition-all text-left overflow-hidden"
           >
             <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
               <GraduationCap className="w-24 h-24 text-primary" />
@@ -163,13 +163,13 @@ export default function TrackSelection({ onSelect, onboardingData, setOnboarding
 
           {/* Bac Pro */}
           <motion.button
-            whileHover={{ y: -8, shadow: "var(--shadow-hover)" }}
-            whileTap={{ scale: 0.97 }}
+            whileHover={{ y: -12, shadow: "var(--shadow-hover)" }}
+            whileTap={{ scale: 0.98 }}
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4, duration: 0.6 }}
             onClick={() => onSelect('pro')}
-            className="group relative p-10 bg-white border border-slate-100 rounded-[2.5rem] shadow-soft hover:border-blue-500/30 transition-all text-left overflow-hidden"
+            className="group relative p-10 bg-white border border-slate-100 rounded-[3rem] shadow-soft hover:border-blue-500/30 transition-all text-left overflow-hidden"
           >
             <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
               <Briefcase className="w-24 h-24 text-blue-500" />
