@@ -28,7 +28,8 @@ import {
   Target,
   X,
   Building2,
-  Navigation
+  Navigation,
+  Bell
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -36,7 +37,6 @@ import OnboardingQuestionnaire, { OnboardingData } from './components/Onboarding
 import StatsPanel from './components/StatsPanel';
 import TrackSelection from './components/TrackSelection';
 import ProPage from './components/ProPage';
-import Sandbox from './components/Sandbox';
 
 // Utility for tailwind classes
 function cn(...inputs: ClassValue[]) {
@@ -167,7 +167,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [onboardingComplete, setOnboardingComplete] = useState(false);
   const [onboardingData, setOnboardingData] = useState<OnboardingData | null>(null);
-  const [bacType, setBacType] = useState<'general' | 'pro' | 'sandbox' | null>(null);
+  const [bacType, setBacType] = useState<'general' | 'pro' | null>(null);
   
   const [searchQuery, setSearchQuery] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -258,37 +258,99 @@ export default function App() {
         setIndividualSpecialties(individual);
       }
 
-      // Load All Formation Types for the map
-      const { data: typeData, error: typeError } = await supabase
-        .from('parcoursup_2')
-        .select('filiere_generale');
+      // Load All Formation Types for the map (Paginated)
+      let allTypeData: any[] = [];
+      let typeFrom = 0;
+      const TYPE_PAGE_SIZE = 1000;
+      let hasMoreType = true;
 
-      if (!typeError && typeData) {
-        const uniqueTypes = Array.from(new Set(typeData.map(row => row.filiere_generale)))
+      while (hasMoreType) {
+        const { data, error } = await supabase
+          .from('parcoursup_2')
+          .select('filiere_generale')
+          .neq('pct_admis_neo_gen', '0')
+          .not('pct_admis_neo_gen', 'is', null)
+          .range(typeFrom, typeFrom + TYPE_PAGE_SIZE - 1);
+        
+        if (error) throw error;
+        if (data && data.length > 0) {
+          allTypeData = [...allTypeData, ...data];
+          if (data.length < TYPE_PAGE_SIZE) {
+            hasMoreType = false;
+          } else {
+            typeFrom += TYPE_PAGE_SIZE;
+          }
+        } else {
+          hasMoreType = false;
+        }
+      }
+
+      if (allTypeData.length > 0) {
+        const uniqueTypes = Array.from(new Set(allTypeData.map(row => row.filiere_generale)))
           .filter(Boolean)
           .sort() as string[];
         setAllFormationTypes(uniqueTypes);
       }
 
-      // Load All Cities for the map filter
-      const { data: cityData, error: cityError } = await supabase
-        .from('parcoursup_2')
-        .select('commune');
+      // Load All Cities for the map filter (Paginated)
+      let allCityData: any[] = [];
+      let cityFrom = 0;
+      const CITY_PAGE_SIZE = 1000;
+      let hasMoreCity = true;
 
-      if (!cityError && cityData) {
-        const uniqueCities = Array.from(new Set(cityData.map(row => row.commune)))
+      while (hasMoreCity) {
+        const { data, error } = await supabase
+          .from('parcoursup_2')
+          .select('commune')
+          .range(cityFrom, cityFrom + CITY_PAGE_SIZE - 1);
+        
+        if (error) throw error;
+        if (data && data.length > 0) {
+          allCityData = [...allCityData, ...data];
+          if (data.length < CITY_PAGE_SIZE) {
+            hasMoreCity = false;
+          } else {
+            cityFrom += CITY_PAGE_SIZE;
+          }
+        } else {
+          hasMoreCity = false;
+        }
+      }
+
+      if (allCityData.length > 0) {
+        const uniqueCities = Array.from(new Set(allCityData.map(row => row.commune)))
           .filter(Boolean)
           .sort() as string[];
         setAllCities(uniqueCities);
       }
 
-      // Load All Departments for the map filter
-      const { data: deptData, error: deptError } = await supabase
-        .from('parcoursup_2')
-        .select('departement');
+      // Load All Departments for the map filter (Paginated)
+      let allDeptData: any[] = [];
+      let deptFrom = 0;
+      const DEPT_PAGE_SIZE = 1000;
+      let hasMoreDept = true;
 
-      if (!deptError && deptData) {
-        const uniqueDepts = Array.from(new Set(deptData.map(row => row.departement)))
+      while (hasMoreDept) {
+        const { data, error } = await supabase
+          .from('parcoursup_2')
+          .select('departement')
+          .range(deptFrom, deptFrom + DEPT_PAGE_SIZE - 1);
+        
+        if (error) throw error;
+        if (data && data.length > 0) {
+          allDeptData = [...allDeptData, ...data];
+          if (data.length < DEPT_PAGE_SIZE) {
+            hasMoreDept = false;
+          } else {
+            deptFrom += DEPT_PAGE_SIZE;
+          }
+        } else {
+          hasMoreDept = false;
+        }
+      }
+
+      if (allDeptData.length > 0) {
+        const uniqueDepts = Array.from(new Set(allDeptData.map(row => row.departement)))
           .filter(Boolean)
           .sort() as string[];
         setAllDepartments(uniqueDepts);
@@ -325,6 +387,8 @@ export default function App() {
             .from('parcoursup_2')
             .select('*')
             .in('filiere_generale', geoFilter.formationTypes)
+            .neq('pct_admis_neo_gen', '0')
+            .not('pct_admis_neo_gen', 'is', null)
             .range(from, from + PAGE_SIZE - 1);
           
           if (error) throw error;
@@ -627,15 +691,11 @@ export default function App() {
   }
 
   if (!bacType) {
-    return <TrackSelection onSelect={setBacType} />;
+    return <TrackSelection onSelect={setBacType} onboardingData={onboardingData} setOnboardingComplete={setOnboardingComplete} />;
   }
 
   if (bacType === 'pro') {
-    return <ProPage onBack={() => setBacType(null)} onboardingData={onboardingData} />;
-  }
-
-  if (bacType === 'sandbox') {
-    return <Sandbox onBack={() => setBacType(null)} genData={data} proData={mapSpecificData} />;
+    return <ProPage onBack={() => setBacType(null)} onboardingData={onboardingData} setOnboardingComplete={setOnboardingComplete} />;
   }
 
   if (!onboardingComplete) {
@@ -653,23 +713,86 @@ export default function App() {
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-primary-light selection:text-primary">
       {/* Header */}
       <header className="bg-primary sticky top-0 z-50 shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <svg viewBox="0 0 160 40" className="h-9 w-auto fill-white" xmlns="http://www.w3.org/2000/svg">
-              <text x="0" y="32" fontFamily="Arial, sans-serif" fontWeight="900" fontStyle="italic" fontSize="28" fill="white">l'Étudiant</text>
-            </svg>
-          </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
-          <div className="flex items-center gap-4">
-            <button 
-              onClick={() => setOnboardingComplete(false)}
-              className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl border border-white/20 transition-all text-sm font-bold shadow-sm"
-            >
-              <Users className="w-4 h-4" />
-              <span className="hidden sm:inline">Modifier mon profil</span>
-              <span className="sm:hidden">Profil</span>
-            </button>
+          {/* --- LIGNE HAUT : Logo et Actions --- */}
+          <div className="h-16 flex items-center justify-between">
+            {/* Logo */}
+            <div className="flex items-center gap-2">
+              <img 
+                src="/Logo.png" 
+                alt="Logo l'Étudiant" 
+                className="h-8 w-auto object-contain brightness-0 invert" 
+              />
+            </div>
+            
+            {/* Actions Droite */}
+            <div className="flex items-center gap-5">
+              <button className="text-white hover:text-white/80 transition-colors">
+                <Bell className="w-5 h-5 sm:w-6 sm:h-6" />
+              </button>
+              <button className="text-white hover:text-white/80 transition-colors">
+                <Search className="w-5 h-5 sm:w-6 sm:h-6" />
+              </button>
+
+              <div className="hidden sm:block w-px h-6 bg-white/30"></div> {/* Séparateur vertical */}
+
+              {/* Vos données onboarding (conservées) */}
+              {onboardingData && (
+                <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-white/20 rounded-full border border-white/30 backdrop-blur-sm">
+                  <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="text-xs font-bold text-white uppercase tracking-widest">
+                    {onboardingData.specialty}
+                  </span>
+                </div>
+              )}
+              
+              {/* Votre bouton profil (adapté pour ressembler à un avatar/bouton d'action) */}
+              <button 
+                onClick={() => setOnboardingComplete(false)}
+                className="flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 bg-white/10 hover:bg-white/20 text-white rounded-full sm:rounded-xl border border-white/20 transition-all text-sm font-bold shadow-sm"
+              >
+                <Users className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="hidden sm:inline">Profil</span>
+              </button>
+            </div>
           </div>
+
+          {/* --- LIGNE BAS : Navigation --- */}
+          <nav className="flex items-center gap-6 pb-3 overflow-x-auto no-scrollbar">
+            <a href="#" className="text-white font-bold text-[14px] sm:text-[15px] hover:underline whitespace-nowrap">Salons</a>
+            
+            <button className="flex items-center gap-1 text-white font-bold text-[14px] sm:text-[15px] hover:underline whitespace-nowrap">
+              Orientation <ChevronDown className="w-4 h-4" />
+            </button>
+            
+            <button className="flex items-center gap-1 text-white font-bold text-[14px] sm:text-[15px] hover:underline whitespace-nowrap">
+              Révisions / Examens <ChevronDown className="w-4 h-4" />
+            </button>
+            
+            <button className="flex items-center gap-1 text-white font-bold text-[14px] sm:text-[15px] hover:underline whitespace-nowrap">
+              Métiers <ChevronDown className="w-4 h-4" />
+            </button>
+            
+            <button className="flex items-center gap-1 text-white font-bold text-[14px] sm:text-[15px] hover:underline whitespace-nowrap">
+              Vie étudiante <ChevronDown className="w-4 h-4" />
+            </button>
+            
+            <button className="flex items-center gap-1 text-white font-bold text-[14px] sm:text-[15px] hover:underline whitespace-nowrap">
+              Jobs, stages, alternance <ChevronDown className="w-4 h-4" />
+            </button>
+            
+            <a href="#" className="text-white font-bold text-[14px] sm:text-[15px] hover:underline whitespace-nowrap">EducPros</a>
+          </nav>
+        </div>
+
+        {/* --- LIGNE MULTICOLORE (Design signature l'Étudiant) --- */}
+        <div className="h-1 w-full flex">
+          <div className="h-full flex-1 bg-pink-500"></div>
+          <div className="h-full flex-1 bg-yellow-400"></div>
+          <div className="h-full flex-1 bg-green-500"></div>
+          <div className="h-full flex-1 bg-blue-500"></div>
+          <div className="h-full flex-1 bg-orange-500"></div>
         </div>
       </header>
 
