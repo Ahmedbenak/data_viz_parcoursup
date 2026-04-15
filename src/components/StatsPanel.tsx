@@ -662,7 +662,7 @@ export default function StatsPanel({ data, userNote, selectedDepartment, allData
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 relative z-10">
           {[
-            { icon: GraduationCap, text: `${Math.round(profile?.neoGen || 0)}% des admis ont un bac général`, color: 'text-blue-400', bg: 'bg-blue-400/10' },
+            { icon: GraduationCap, text: `${Math.round(profile?.neoPro || 0)}% des admis ont un bac pro`, color: 'text-pink-400', bg: 'bg-pink-400/10' },
             { icon: Target, text: `Note moyenne requise : ${(profile?.meanNote || 0).toFixed(1)}/20`, color: 'text-primary', bg: 'bg-primary/10' },
             { icon: UserCheck, text: `${Math.round(100 - (profile?.mentions.sans || 0))}% des admis ont une mention`, color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
             { icon: Users, text: `${Math.round(profile?.boursiers || 0)}% de boursiers parmi les admis`, color: 'text-purple-400', bg: 'bg-purple-400/10' }
