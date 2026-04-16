@@ -7,11 +7,7 @@ import {
   YAxis, 
   CartesianGrid, 
   Tooltip, 
-  ResponsiveContainer, 
-  PieChart, 
-  Pie, 
-  Cell,
-  Legend
+  ResponsiveContainer
 } from 'recharts';
 import { 
   Search, 
@@ -26,7 +22,6 @@ import {
   ChevronDown,
   MapPin,
   Target,
-  X,
   Building2,
   Navigation,
   Bell
@@ -153,6 +148,8 @@ function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
   return R * c;
 }
 
+import Header from './components/Header';
+
 function MapUpdater({ center }: { center: [number, number] }) {
   const map = useMap();
   useEffect(() => {
@@ -173,7 +170,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [onboardingComplete, setOnboardingComplete] = useState(false);
   const [onboardingData, setOnboardingData] = useState<OnboardingData | null>(null);
-  const [bacType, setBacType] = useState<'general' | 'pro' | null>(null);
+  const [bacType, setBacType] = useState<'general' | 'pro' | 'techno' | null>(null);
   
   const [searchQuery, setSearchQuery] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -630,6 +627,32 @@ export default function App() {
     return <ProPage onBack={() => setBacType(null)} onboardingData={onboardingData} setOnboardingComplete={setOnboardingComplete} />;
   }
 
+  if (bacType === 'techno') {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-8">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-center max-w-md bg-white p-12 rounded-[3rem] shadow-soft border border-slate-100"
+        >
+          <div className="w-20 h-20 bg-emerald-50 rounded-[2rem] flex items-center justify-center mb-8 mx-auto">
+            <Target className="w-10 h-10 text-emerald-500" />
+          </div>
+          <h2 className="text-3xl font-black text-slate-900 mb-4">Bac Technologique</h2>
+          <p className="text-slate-500 font-medium mb-8">
+            Cette section est en cours de préparation. Reviens bientôt pour découvrir les statistiques d'admission des séries technologiques !
+          </p>
+          <button 
+            onClick={() => setBacType(null)}
+            className="px-8 py-3 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-colors"
+          >
+            Retour à l'accueil
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
+
   if (!onboardingComplete) {
     return (
       <OnboardingQuestionnaire 
@@ -643,92 +666,9 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-primary-light selection:text-primary">
-      {/* Header */}
-      <header className="bg-primary sticky top-0 z-50 shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          
-          {/* --- LIGNE HAUT : Logo et Actions --- */}
-          <div className="h-16 flex items-center justify-between">
-            {/* Logo */}
-            <div className="flex items-center gap-2">
-              <img 
-                src="/Logo.png" 
-                alt="Logo l'Étudiant" 
-                className="h-8 w-auto object-contain brightness-0 invert" 
-              />
-            </div>
-            
-            {/* Actions Droite */}
-            <div className="flex items-center gap-5">
-              <button className="text-white hover:text-white/80 transition-colors">
-                <Bell className="w-5 h-5 sm:w-6 sm:h-6" />
-              </button>
-              <button className="text-white hover:text-white/80 transition-colors">
-                <Search className="w-5 h-5 sm:w-6 sm:h-6" />
-              </button>
-
-              <div className="hidden sm:block w-px h-6 bg-white/30"></div> {/* Séparateur vertical */}
-
-              {/* Vos données onboarding (conservées) */}
-              {onboardingData && (
-                <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-white/20 rounded-full border border-white/30 backdrop-blur-sm">
-                  <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <span className="text-xs font-bold text-white uppercase tracking-widest">
-                    {onboardingData.specialty}
-                  </span>
-                </div>
-              )}
-              
-              {/* Votre bouton profil (adapté pour ressembler à un avatar/bouton d'action) */}
-              <button 
-                onClick={() => setOnboardingComplete(false)}
-                className="flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 bg-white/10 hover:bg-white/20 text-white rounded-full sm:rounded-xl border border-white/20 transition-all text-sm font-bold shadow-sm"
-              >
-                <Users className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span className="hidden sm:inline">Profil</span>
-              </button>
-            </div>
-          </div>
-
-          {/* --- LIGNE BAS : Navigation --- */}
-          <nav className="flex items-center gap-6 pb-3 overflow-x-auto no-scrollbar">
-            <a href="#" className="text-white font-bold text-[14px] sm:text-[15px] hover:underline whitespace-nowrap">Salons</a>
-            
-            <button className="flex items-center gap-1 text-white font-bold text-[14px] sm:text-[15px] hover:underline whitespace-nowrap">
-              Orientation <ChevronDown className="w-4 h-4" />
-            </button>
-            
-            <button className="flex items-center gap-1 text-white font-bold text-[14px] sm:text-[15px] hover:underline whitespace-nowrap">
-              Révisions / Examens <ChevronDown className="w-4 h-4" />
-            </button>
-            
-            <button className="flex items-center gap-1 text-white font-bold text-[14px] sm:text-[15px] hover:underline whitespace-nowrap">
-              Métiers <ChevronDown className="w-4 h-4" />
-            </button>
-            
-            <button className="flex items-center gap-1 text-white font-bold text-[14px] sm:text-[15px] hover:underline whitespace-nowrap">
-              Vie étudiante <ChevronDown className="w-4 h-4" />
-            </button>
-            
-            <button className="flex items-center gap-1 text-white font-bold text-[14px] sm:text-[15px] hover:underline whitespace-nowrap">
-              Jobs, stages, alternance <ChevronDown className="w-4 h-4" />
-            </button>
-            
-            <a href="#" className="text-white font-bold text-[14px] sm:text-[15px] hover:underline whitespace-nowrap">EducPros</a>
-          </nav>
-        </div>
-
-        {/* --- LIGNE MULTICOLORE (Design signature l'Étudiant) --- */}
-        <div className="h-1 w-full flex">
-          <div className="h-full flex-1 bg-pink-500"></div>
-          <div className="h-full flex-1 bg-yellow-400"></div>
-          <div className="h-full flex-1 bg-green-500"></div>
-          <div className="h-full flex-1 bg-blue-500"></div>
-          <div className="h-full flex-1 bg-orange-500"></div>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <Header onboardingData={onboardingData} setOnboardingComplete={setOnboardingComplete} />
+      
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Hero / Selection */}
         <section className="mb-16 text-center max-w-4xl mx-auto">
           <motion.div
@@ -1429,6 +1369,7 @@ export default function App() {
                 userNote={parseFloat(onboardingData.averageBac)}
                 selectedDepartment={geoFilter.department || undefined}
                 allDataOfSameType={unfilteredMapFormations}
+                pageType="general"
               />
             )}
           </div>

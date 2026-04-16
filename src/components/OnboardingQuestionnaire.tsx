@@ -3,7 +3,6 @@ import { motion } from 'motion/react';
 import { 
   Check, 
   ChevronRight, 
-  Target, 
   Search,
   GraduationCap
 } from 'lucide-react';

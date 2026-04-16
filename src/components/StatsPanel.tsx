@@ -11,24 +11,20 @@ import {
   ArcElement,
   PointElement,
   LineElement,
-  RadialLinearScale,
 } from 'chart.js';
-import { Bar, Pie, Radar } from 'react-chartjs-2';
+import { Bar, Pie } from 'react-chartjs-2';
 import { 
-  TrendingUp, 
-  Users, 
-  Target, 
+  TrendingUp,
+  CheckCircle2, 
   AlertTriangle, 
-  Info,
-  CheckCircle2,
-  ArrowUpRight,
-  GraduationCap,
-  MapPin,
-  Lightbulb,
-  UserCheck,
-  BarChart3,
+  Info, 
+  MapPin, 
+  Lightbulb, 
+  UserCheck, 
   ChevronRight,
-  Minus
+  GraduationCap,
+  Target,
+  Users
 } from 'lucide-react';
 
 import { clsx, type ClassValue } from 'clsx';
@@ -45,7 +41,6 @@ ChartJS.register(
   BarElement,
   PointElement,
   LineElement,
-  RadialLinearScale,
   ArcElement,
   Title,
   Tooltip,
@@ -86,9 +81,10 @@ interface StatsPanelProps {
   userNote?: number | null;
   selectedDepartment?: string;
   allDataOfSameType: Parcoursup2Data[];
+  pageType: 'general' | 'pro';
 }
 
-export default function StatsPanel({ data, userNote, selectedDepartment, allDataOfSameType }: StatsPanelProps) {
+export default function StatsPanel({ data, userNote, selectedDepartment, allDataOfSameType, pageType }: StatsPanelProps) {
   const [localUserNote, setLocalUserNote] = useState<number | null>(userNote || null);
   const [inputValue, setInputValue] = useState<string>(userNote ? userNote.toString() : '');
 
@@ -205,19 +201,6 @@ export default function StatsPanel({ data, userNote, selectedDepartment, allData
       neoGen: avg(nationalData.map(d => d.pct_admis_neo_gen)),
     };
   }, [nationalData]);
-
-  // Charts Data
-  const accessibilityChartData = {
-    labels: ['Accessibles', 'À votre niveau', 'Ambitieuses'],
-    datasets: [
-      {
-        label: 'Nombre de formations',
-        data: [segments.accessible.count, segments.level.count, segments.ambitious.count],
-        backgroundColor: ['#10b981', '#f59e0b', '#ef4444'],
-        borderRadius: 8,
-      },
-    ],
-  };
 
   const bacChartData = {
     labels: ['Général', 'Techno', 'Pro'],
@@ -662,7 +645,9 @@ export default function StatsPanel({ data, userNote, selectedDepartment, allData
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 relative z-10">
           {[
-            { icon: GraduationCap, text: `${Math.round(profile?.neoPro || 0)}% des admis ont un bac pro`, color: 'text-pink-400', bg: 'bg-pink-400/10' },
+            pageType === 'general' 
+              ? { icon: GraduationCap, text: `${Math.round(profile?.neoGen || 0)}% des admis ont un bac général`, color: 'text-blue-400', bg: 'bg-blue-400/10' }
+              : { icon: GraduationCap, text: `${Math.round(profile?.neoPro || 0)}% des admis ont un bac pro`, color: 'text-pink-400', bg: 'bg-pink-400/10' },
             { icon: Target, text: `Note moyenne requise : ${(profile?.meanNote || 0).toFixed(1)}/20`, color: 'text-primary', bg: 'bg-primary/10' },
             { icon: UserCheck, text: `${Math.round(100 - (profile?.mentions.sans || 0))}% des admis ont une mention`, color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
             { icon: Users, text: `${Math.round(profile?.boursiers || 0)}% de boursiers parmi les admis`, color: 'text-purple-400', bg: 'bg-purple-400/10' }
