@@ -1,5 +1,7 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -24,7 +26,13 @@ import {
   ChevronRight,
   GraduationCap,
   Target,
-  Users
+  Users,
+  ChevronDown,
+  Search,
+  Building2,
+  X,
+  FileDown,
+  Loader2
 } from 'lucide-react';
 
 import { clsx, type ClassValue } from 'clsx';
@@ -80,13 +88,59 @@ interface StatsPanelProps {
   data: Parcoursup2Data[];
   userNote?: number | null;
   selectedDepartment?: string;
+  selectedCity?: string;
+  selectedFormations?: string[];
   allDataOfSameType: Parcoursup2Data[];
+  allFormationTypes: string[];
+  allCities: string[];
+  allDepartments: string[];
+  onFilterChange: (filters: { city?: string; department?: string; formationTypes?: string[] }) => void;
   pageType: 'general' | 'pro';
 }
 
-export default function StatsPanel({ data, userNote, selectedDepartment, allDataOfSameType, pageType }: StatsPanelProps) {
+export default function StatsPanel({ 
+  data, 
+  userNote, 
+  selectedDepartment, 
+  selectedCity, 
+  selectedFormations, 
+  allDataOfSameType, 
+  allFormationTypes,
+  allCities,
+  allDepartments,
+  onFilterChange,
+  pageType 
+}: StatsPanelProps) {
   const [localUserNote, setLocalUserNote] = useState<number | null>(userNote || null);
   const [inputValue, setInputValue] = useState<string>(userNote ? userNote.toString() : '');
+  const [isExporting, setIsExporting] = useState(false);
+  const reportRef = useRef<HTMLDivElement>(null);
+  
+  // Filter bar states
+  const [showFormationDropdown, setShowFormationDropdown] = useState(false);
+  const [citySearch, setCitySearch] = useState(selectedCity || '');
+  const [showCityDropdown, setShowCityDropdown] = useState(false);
+  const [deptSearch, setDeptSearch] = useState(selectedDepartment || '');
+  const [showDeptDropdown, setShowDeptDropdown] = useState(false);
+
+  // Sync city/dept search when props change
+  useEffect(() => {
+    setCitySearch(selectedCity || '');
+  }, [selectedCity]);
+
+  useEffect(() => {
+    setDeptSearch(selectedDepartment || '');
+  }, [selectedDepartment]);
+
+  const filteredCities = useMemo(() => 
+    allCities.filter(c => c.toLowerCase().includes(citySearch.toLowerCase())).slice(0, 10),
+    [allCities, citySearch]
+  );
+
+  const filteredDepts = useMemo(() => 
+    allDepartments.filter(d => d.toLowerCase().includes(deptSearch.toLowerCase())).slice(0, 10),
+    [allDepartments, deptSearch]
+  );
 
   // Sync with prop if it changes from outside
   useEffect(() => {
@@ -101,6 +155,49 @@ export default function StatsPanel({ data, userNote, selectedDepartment, allData
     const val = parseFloat(sanitized);
     if (!isNaN(val) && val >= 0 && val <= 20) {
       setLocalUserNote(val);
+    }
+  };
+
+  const handleDownloadPDF = async () => {
+    if (!reportRef.current) return;
+    
+    try {
+      setIsExporting(true);
+      const element = reportRef.current;
+      
+      // Selectively hide elements that shouldn't be in PDF (like the filter bar and download button)
+      const filterBar = element.querySelector('.dynamic-filter-bar');
+      const noPrintBtns = element.querySelectorAll('.no-print-btn');
+      
+      if (filterBar) (filterBar as HTMLElement).style.display = 'none';
+      noPrintBtns.forEach(btn => (btn as HTMLElement).style.display = 'none');
+      
+      const canvas = await html2canvas(element, {
+        scale: 2, // Better quality
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#f8fafc', // match slate-50 background
+        windowWidth: element.scrollWidth,
+        windowHeight: element.scrollHeight
+      });
+      
+      if (filterBar) (filterBar as HTMLElement).style.display = 'flex';
+      noPrintBtns.forEach(btn => (btn as HTMLElement).style.display = 'flex');
+      
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'px',
+        format: [canvas.width / 2, canvas.height / 2] // match the scaled canvas size back to original
+      });
+      
+      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
+      pdf.save(`Rapport_Orientation_${pageType === 'general' ? 'General' : 'Pro'}_${new Date().toISOString().split('T')[0]}.pdf`);
+      
+    } catch (err) {
+      console.error('Error generating PDF:', err);
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -252,7 +349,7 @@ export default function StatsPanel({ data, userNote, selectedDepartment, allData
   if (validData.length === 0) return null;
 
   return (
-    <div className="mt-20 space-y-16 pb-24">
+    <div ref={reportRef} className="mt-20 space-y-16 pb-24">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-8">
         <div className="flex items-center gap-6">
@@ -260,11 +357,214 @@ export default function StatsPanel({ data, userNote, selectedDepartment, allData
             <TrendingUp className="w-8 h-8 text-primary" />
           </div>
           <div>
-            <h3 className="text-4xl md:text-6xl font-black text-slate-900 tracking-tight leading-tight">Analyse <span className="text-primary">Statistique</span></h3>
-            <p className="text-slate-500 font-medium text-xl">Décryptage de ton profil et des opportunités</p>
+            <h3 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tight leading-tight">
+              Analyse <span className="text-primary">Statistique</span> pour la formation : 
+              <span className="block text-2xl md:text-3xl mt-2 text-slate-700">
+                {selectedFormations && selectedFormations.length > 0 
+                  ? selectedFormations.join(', ') 
+                  : 'Toutes les formations'}
+              </span>
+            </h3>
+            <p className="text-slate-500 font-medium text-lg mt-2 flex items-center gap-2">
+              <MapPin className="w-4 h-4" />
+              Basé sur : {[selectedCity, selectedDepartment].filter(Boolean).join(', ') || 'France entière'}
+            </p>
           </div>
         </div>
+
+        {/* Action Buttons */}
+        <div className="flex items-center gap-4 no-print-btn">
+          <button
+            onClick={handleDownloadPDF}
+            disabled={isExporting}
+            className={cn(
+              "flex items-center gap-3 px-6 py-4 rounded-2xl font-black text-sm uppercase tracking-wider transition-all shadow-lg",
+              isExporting 
+                ? "bg-slate-100 text-slate-400 cursor-not-allowed" 
+                : "bg-slate-900 text-white hover:bg-slate-800 hover:shadow-xl active:scale-95 shadow-slate-900/20"
+            )}
+          >
+            {isExporting ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Génération...
+              </>
+            ) : (
+              <>
+                <FileDown className="w-5 h-5" />
+                Télécharger le rapport PDF
+              </>
+            )}
+          </button>
+        </div>
       </div>
+
+      {/* Dynamic Filter Bar */}
+      <div className="dynamic-filter-bar bg-white p-4 rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-200/50 flex flex-wrap items-center gap-4 relative z-50">
+          {/* Formation Filter */}
+          <div className="flex-1 min-w-[200px] relative">
+            <button 
+              onClick={() => setShowFormationDropdown(!showFormationDropdown)}
+              className="w-full h-12 px-6 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-between text-sm font-bold text-slate-700 hover:bg-slate-100 transition-all"
+            >
+              <div className="flex items-center gap-2 truncate">
+                <GraduationCap className="w-4 h-4 text-primary" />
+                <span className="truncate">
+                  {selectedFormations && selectedFormations.length > 0 
+                    ? `${selectedFormations.length} types sélectionnés` 
+                    : 'Toutes les formations'}
+                </span>
+              </div>
+              <ChevronDown className={cn("w-4 h-4 transition-transform", showFormationDropdown && "rotate-180")} />
+            </button>
+            
+            {showFormationDropdown && (
+              <>
+                <div className="fixed inset-0 z-[60]" onClick={() => setShowFormationDropdown(false)} />
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-2xl z-[70] p-4 max-h-[300px] overflow-y-auto custom-scrollbar">
+                  <div className="space-y-2">
+                    {allFormationTypes.map((type, i) => {
+                      const isSelected = selectedFormations?.includes(type);
+                      return (
+                        <label key={i} className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-xl cursor-pointer transition-colors">
+                          <input 
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => {
+                              const newList = isSelected 
+                                ? selectedFormations?.filter(t => t !== type) 
+                                : [...(selectedFormations || []), type];
+                              onFilterChange({ formationTypes: newList });
+                            }}
+                            className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary"
+                          />
+                          <span className="text-sm font-bold text-slate-600">{type}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* City Filter */}
+          <div className="flex-1 min-w-[200px] relative">
+            <div className="relative h-12">
+              <input 
+                type="text"
+                placeholder="Ville (ex: Lyon)"
+                value={citySearch}
+                onChange={(e) => {
+                  setCitySearch(e.target.value);
+                  setShowCityDropdown(true);
+                  if (e.target.value === '') onFilterChange({ city: '' });
+                }}
+                onFocus={() => setShowCityDropdown(true)}
+                className="w-full h-full pl-12 pr-10 rounded-2xl bg-slate-50 border border-slate-100 text-sm font-bold text-slate-700 focus:bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all shadow-inner"
+              />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              {citySearch && (
+                <button 
+                  onClick={() => { setCitySearch(''); onFilterChange({ city: '' }); }}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-full transition-all"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+
+            {showCityDropdown && citySearch && (
+              <>
+                <div className="fixed inset-0 z-[60]" onClick={() => setShowCityDropdown(false)} />
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-2xl z-[70] overflow-hidden">
+                  {filteredCities.length > 0 ? (
+                    filteredCities.map((city, i) => (
+                      <button
+                        key={i}
+                        onClick={() => {
+                          onFilterChange({ city });
+                          setCitySearch(city);
+                          setShowCityDropdown(false);
+                        }}
+                        className="w-full px-5 py-3 text-left text-sm font-bold text-slate-600 hover:bg-primary-light hover:text-primary transition-all flex items-center gap-3"
+                      >
+                        <Building2 className="w-4 h-4 text-slate-300" />
+                        {city}
+                      </button>
+                    ))
+                  ) : (
+                    <div className="px-5 py-3 text-sm text-slate-400 italic">Aucune ville trouvée</div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Department Filter */}
+          <div className="flex-1 min-w-[200px] relative">
+            <div className="relative h-12">
+              <input 
+                type="text"
+                placeholder="Département"
+                value={deptSearch}
+                onChange={(e) => {
+                  setDeptSearch(e.target.value);
+                  setShowDeptDropdown(true);
+                  if (e.target.value === '') onFilterChange({ department: '' });
+                }}
+                onFocus={() => setShowDeptDropdown(true)}
+                className="w-full h-full pl-12 pr-10 rounded-2xl bg-slate-50 border border-slate-100 text-sm font-bold text-slate-700 focus:bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all shadow-inner"
+              />
+              <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              {deptSearch && (
+                <button 
+                  onClick={() => { setDeptSearch(''); onFilterChange({ department: '' }); }}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-full transition-all"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+
+            {showDeptDropdown && deptSearch && (
+              <>
+                <div className="fixed inset-0 z-[60]" onClick={() => setShowDeptDropdown(false)} />
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-2xl z-[70] overflow-hidden">
+                  {filteredDepts.length > 0 ? (
+                    filteredDepts.map((dept, i) => (
+                      <button
+                        key={i}
+                        onClick={() => {
+                          onFilterChange({ department: dept });
+                          setDeptSearch(dept);
+                          setShowDeptDropdown(false);
+                        }}
+                        className="w-full px-5 py-3 text-left text-sm font-bold text-slate-600 hover:bg-primary-light hover:text-primary transition-all flex items-center gap-3"
+                      >
+                        <MapPin className="w-4 h-4 text-slate-300" />
+                        {dept}
+                      </button>
+                    ))
+                  ) : (
+                    <div className="px-5 py-3 text-sm text-slate-400 italic">Aucun département trouvé</div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+
+          <div className="h-8 w-px bg-slate-200 hidden lg:block" />
+
+          {/* Reset Filters */}
+          <button 
+            onClick={() => onFilterChange({ city: '', department: '', formationTypes: [] })}
+            className="h-12 px-6 rounded-2xl bg-rose-50 text-rose-500 text-sm font-black uppercase tracking-wider hover:bg-rose-100 transition-all flex items-center gap-2"
+          >
+            <X className="w-4 h-4" />
+            Réinitialiser
+          </button>
+        </div>
 
       {/* Overview Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">

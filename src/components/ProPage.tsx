@@ -1141,7 +1141,13 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
             data={filteredMapData} 
             userNote={onboardingData ? parseFloat(onboardingData.averageBac) : null}
             selectedDepartment={geoFilter.department || undefined}
+            selectedCity={geoFilter.city || undefined}
+            selectedFormations={geoFilter.formationTypes}
             allDataOfSameType={mapData}
+            allFormationTypes={allFormationTypes}
+            allCities={allCities}
+            allDepartments={allDepartments}
+            onFilterChange={(filters) => setGeoFilter(prev => ({ ...prev, ...filters }))}
             pageType="pro"
           />
         )}

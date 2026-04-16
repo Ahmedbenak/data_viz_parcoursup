@@ -422,6 +422,15 @@ export default function App() {
       setSearchQuery(data.specialty);
     }
     setFilterAverage(data.averageBac);
+    
+    // Pre-fill formation types filter
+    if (data.targetFormationTypes && data.targetFormationTypes.length > 0) {
+      setGeoFilter(prev => ({
+        ...prev,
+        formationTypes: data.targetFormationTypes
+      }));
+    }
+    
     setOnboardingComplete(true);
   };
 
@@ -660,6 +669,7 @@ export default function App() {
         specialties={specialties}
         individualSpecialties={individualSpecialties}
         loadingSpecialties={loading}
+        allFormationTypes={allFormationTypes}
       />
     );
   }
@@ -1014,6 +1024,23 @@ export default function App() {
               </div>
             </div>
 
+            {/* Stats Panel Section */}
+            {onboardingData && (
+              <StatsPanel 
+                data={mapFormations} 
+                userNote={parseFloat(onboardingData.averageBac)}
+                selectedDepartment={geoFilter.department || undefined}
+                selectedCity={geoFilter.city || undefined}
+                selectedFormations={geoFilter.formationTypes}
+                allDataOfSameType={unfilteredMapFormations}
+                allFormationTypes={allFormationTypes}
+                allCities={allCities}
+                allDepartments={allDepartments}
+                onFilterChange={(filters) => setGeoFilter(prev => ({ ...prev, ...filters }))}
+                pageType="general"
+              />
+            )}
+
             {/* Map Section */}
             <div className="bg-white rounded-3xl border border-slate-200 shadow-sm">
               <div className="p-6 border-b border-slate-100">
@@ -1361,17 +1388,6 @@ export default function App() {
                 </div>
               </div>
             </div>
-
-            {/* Stats Panel Section */}
-            {onboardingData && (
-              <StatsPanel 
-                data={mapFormations} 
-                userNote={parseFloat(onboardingData.averageBac)}
-                selectedDepartment={geoFilter.department || undefined}
-                allDataOfSameType={unfilteredMapFormations}
-                pageType="general"
-              />
-            )}
           </div>
         ) : (
           <div className="text-center py-20 bg-white rounded-3xl border-2 border-dashed border-slate-200">
