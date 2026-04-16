@@ -546,7 +546,7 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
 
   return (
     <div className="min-h-screen bg-slate-50 pb-20">
-      <Header onboardingData={onboardingData} setOnboardingComplete={setOnboardingComplete} />
+      <Header onboardingData={onboardingData} setOnboardingComplete={setOnboardingComplete} onHome={onBack} />
 
       <main className="max-w-7xl mx-auto px-6 sm:px-10 py-12">
         {/* Bac Pro Selection Bar */}

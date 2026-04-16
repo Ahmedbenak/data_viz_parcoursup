@@ -11,9 +11,10 @@ function cn(...inputs: ClassValue[]) {
 interface HeaderProps {
   onboardingData?: any;
   setOnboardingComplete: (complete: boolean) => void;
+  onHome: () => void;
 }
 
-export default function Header({ onboardingData, setOnboardingComplete }: HeaderProps) {
+export default function Header({ onboardingData, setOnboardingComplete, onHome }: HeaderProps) {
   const [isVisible, setIsVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
 
@@ -82,7 +83,7 @@ export default function Header({ onboardingData, setOnboardingComplete }: Header
               
               {/* Votre bouton profil (adapté pour ressembler à un avatar/bouton d'action) */}
               <button 
-                onClick={() => setOnboardingComplete(false)}
+                onClick={onHome}
                 className="flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 bg-white/10 hover:bg-white/20 text-white rounded-full sm:rounded-xl border border-white/20 transition-all text-sm font-bold shadow-sm"
               >
                 <Users className="w-4 h-4 sm:w-5 sm:h-5" />

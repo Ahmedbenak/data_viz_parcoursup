@@ -19,7 +19,7 @@ interface TrackSelectionProps {
 export default function TrackSelection({ onSelect, onboardingData, setOnboardingComplete }: TrackSelectionProps) {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col relative overflow-hidden">
-      <Header onboardingData={onboardingData} setOnboardingComplete={setOnboardingComplete} />
+      <Header onboardingData={onboardingData} setOnboardingComplete={setOnboardingComplete} onHome={() => onSelect(null)} />
 
       <div className="flex-1 flex flex-col items-center justify-center p-6 sm:p-12 relative">
       {/* Decorative background elements */}
