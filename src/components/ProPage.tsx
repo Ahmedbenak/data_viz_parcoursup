@@ -1136,21 +1136,19 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
         </div>
 
         {/* Stats Panel Section */}
-        {filteredMapData.length > 0 && (
-          <StatsPanel 
-            data={filteredMapData} 
-            userNote={onboardingData ? parseFloat(onboardingData.averageBac) : null}
-            selectedDepartment={geoFilter.department || undefined}
-            selectedCity={geoFilter.city || undefined}
-            selectedFormations={geoFilter.formationTypes}
-            allDataOfSameType={mapData}
-            allFormationTypes={allFormationTypes}
-            allCities={allCities}
-            allDepartments={allDepartments}
-            onFilterChange={(filters) => setGeoFilter(prev => ({ ...prev, ...filters }))}
-            pageType="pro"
-          />
-        )}
+        <StatsPanel 
+          data={filteredMapData} 
+          userNote={onboardingData ? parseFloat(onboardingData.averageBac) : null}
+          selectedDepartment={geoFilter.department || undefined}
+          selectedCity={geoFilter.city || undefined}
+          selectedFormations={geoFilter.formationTypes}
+          allDataOfSameType={mapData}
+          allFormationTypes={allFormationTypes}
+          allCities={allCities}
+          allDepartments={allDepartments}
+          onFilterChange={(filters) => setGeoFilter(prev => ({ ...prev, ...filters }))}
+          pageType="pro"
+        />
 
         <div className="grid grid-cols-1 gap-8">
           {/* External Links */}

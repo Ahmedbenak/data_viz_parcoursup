@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import { toPng } from 'html-to-image';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -172,26 +172,28 @@ export default function StatsPanel({
       if (filterBar) (filterBar as HTMLElement).style.display = 'none';
       noPrintBtns.forEach(btn => (btn as HTMLElement).style.display = 'none');
       
-      const canvas = await html2canvas(element, {
-        scale: 2, // Better quality
-        useCORS: true,
-        logging: false,
+      const dataUrl = await toPng(element, {
+        quality: 0.95,
         backgroundColor: '#f8fafc', // match slate-50 background
-        windowWidth: element.scrollWidth,
-        windowHeight: element.scrollHeight
+        width: element.offsetWidth,
+        height: element.offsetHeight,
+        cacheBust: true,
+        style: {
+          transform: 'scale(1)',
+          transformOrigin: 'top left'
+        }
       });
       
       if (filterBar) (filterBar as HTMLElement).style.display = 'flex';
       noPrintBtns.forEach(btn => (btn as HTMLElement).style.display = 'flex');
       
-      const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'px',
-        format: [canvas.width / 2, canvas.height / 2] // match the scaled canvas size back to original
+        format: [element.offsetWidth, element.offsetHeight]
       });
       
-      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
+      pdf.addImage(dataUrl, 'PNG', 0, 0, element.offsetWidth, element.offsetHeight);
       pdf.save(`Rapport_Orientation_${pageType === 'general' ? 'General' : 'Pro'}_${new Date().toISOString().split('T')[0]}.pdf`);
       
     } catch (err) {
@@ -346,12 +348,12 @@ export default function StatsPanel({
     ],
   };
 
-  if (validData.length === 0) return null;
+  const isEmpty = validData.length === 0;
 
   return (
-    <div ref={reportRef} className="mt-20 space-y-16 pb-24">
+    <div ref={reportRef} className="mt-20 space-y-16 pb-24 relative">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-8">
+      <div className={cn("flex flex-col md:flex-row md:items-center justify-between gap-8 transition-all", isEmpty && "opacity-60")}>
         <div className="flex items-center gap-6">
           <div className="w-16 h-16 bg-primary-light rounded-[1.5rem] flex items-center justify-center shadow-soft ring-4 ring-white">
             <TrendingUp className="w-8 h-8 text-primary" />
@@ -373,30 +375,32 @@ export default function StatsPanel({
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-4 no-print-btn">
-          <button
-            onClick={handleDownloadPDF}
-            disabled={isExporting}
-            className={cn(
-              "flex items-center gap-3 px-6 py-4 rounded-2xl font-black text-sm uppercase tracking-wider transition-all shadow-lg",
-              isExporting 
-                ? "bg-slate-100 text-slate-400 cursor-not-allowed" 
-                : "bg-slate-900 text-white hover:bg-slate-800 hover:shadow-xl active:scale-95 shadow-slate-900/20"
-            )}
-          >
-            {isExporting ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                Génération...
-              </>
-            ) : (
-              <>
-                <FileDown className="w-5 h-5" />
-                Télécharger le rapport PDF
-              </>
-            )}
-          </button>
-        </div>
+        {!isEmpty && (
+          <div className="flex items-center gap-4 no-print-btn">
+            <button
+              onClick={handleDownloadPDF}
+              disabled={isExporting}
+              className={cn(
+                "flex items-center gap-3 px-6 py-4 rounded-2xl font-black text-sm uppercase tracking-wider transition-all shadow-lg",
+                isExporting 
+                  ? "bg-slate-100 text-slate-400 cursor-not-allowed" 
+                  : "bg-slate-900 text-white hover:bg-slate-800 hover:shadow-xl active:scale-95 shadow-slate-900/20"
+              )}
+            >
+              {isExporting ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Génération...
+                </>
+              ) : (
+                <>
+                  <FileDown className="w-5 h-5" />
+                  Télécharger le rapport PDF
+                </>
+              )}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Dynamic Filter Bar */}
@@ -566,8 +570,34 @@ export default function StatsPanel({
           </button>
         </div>
 
-      {/* Overview Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+      <div className={cn("space-y-16 transition-all duration-500 relative", isEmpty && "grayscale opacity-40 pointer-events-none select-none blur-[1px]")}>
+        {isEmpty && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-auto">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-white/90 backdrop-blur-md p-10 rounded-[3rem] shadow-2xl border border-slate-200 max-w-md text-center"
+            >
+              <div className="w-20 h-20 bg-primary-light rounded-[2rem] flex items-center justify-center mx-auto mb-6">
+                <Search className="w-10 h-10 text-primary" />
+              </div>
+              <h4 className="text-2xl font-black text-slate-900 mb-4">Aucune statistique à afficher</h4>
+              <p className="text-slate-600 font-medium mb-8 leading-relaxed">
+                Veuillez sélectionner au moins une formation dans les filtres ci-dessus pour afficher l'analyse statistique détaillée.
+              </p>
+              <button 
+                onClick={() => setShowFormationDropdown(true)}
+                className="px-8 py-3 bg-primary text-white rounded-2xl font-bold hover:bg-primary-dark transition-all shadow-lg shadow-primary/20 flex items-center gap-2 mx-auto"
+              >
+                <GraduationCap className="w-5 h-5" />
+                Choisir une formation
+              </button>
+            </motion.div>
+          </div>
+        )}
+
+        {/* Overview Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -964,6 +994,7 @@ export default function StatsPanel({
             </motion.div>
           ))}
         </div>
+      </div>
       </div>
     </div>
   );
