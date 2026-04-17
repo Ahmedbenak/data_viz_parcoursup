@@ -178,6 +178,38 @@ export default function App() {
   // Dashboard Filters
   const [filterAverage, setFilterAverage] = useState<string>('');
   
+  // Phase tracking for sidebar guide
+  const [activePhase, setActivePhase] = useState<1 | 2 | 3>(1);
+
+  // Scroll spy for phase tracking
+  useEffect(() => {
+    if (!selectedSpecialty) return;
+
+    const handleScroll = () => {
+      const vh = window.innerHeight;
+      const threshold = vh * 0.4; // 40% of viewport height
+
+      // Check phases from bottom to top
+      const p3 = document.getElementById('trigger-phase-3');
+      const p2 = document.getElementById('trigger-phase-2');
+      const p1 = document.getElementById('trigger-phase-1');
+
+      if (p3 && p3.getBoundingClientRect().top < threshold) {
+        setActivePhase(3);
+      } else if (p2 && p2.getBoundingClientRect().top < threshold) {
+        setActivePhase(2);
+      } else if (p1) {
+        setActivePhase(1);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    // Initial check
+    handleScroll();
+
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [selectedSpecialty]);
+  
   // Table Filters & Sorting
   const [tableFilterMetric, setTableFilterMetric] = useState<'voeux' | 'admissions' | 'taux'>('voeux');
   const [sortConfig, setSortConfig] = useState<{ key: 'name' | 'voeux' | 'admissions' | 'taux', direction: 'asc' | 'desc' }>({
@@ -787,8 +819,66 @@ export default function App() {
         </section>
 
         {selectedSpecialty ? (
-          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 relative">
-            {loadingDetails && (
+          <div className="lg:grid lg:grid-cols-[80px_1fr] gap-12 animate-in fade-in slide-in-from-bottom-4 duration-700 relative">
+            {/* Sidebar Guide - Sticky Vertical Rail */}
+            <aside className="hidden lg:block">
+              <div className="sticky top-40 space-y-24">
+                {/* Phase 1 */}
+                <div 
+                  className={cn(
+                    "flex flex-col items-center cursor-pointer group transition-all duration-500",
+                    activePhase === 1 ? "opacity-100" : "opacity-30 hover:opacity-100"
+                  )}
+                  onClick={() => document.getElementById('trigger-phase-1')?.scrollIntoView({ behavior: 'smooth' })}
+                >
+                  <div className="[writing-mode:vertical-rl] rotate-180 whitespace-nowrap text-[11px] font-black uppercase tracking-[0.3em] text-slate-500 group-hover:text-primary transition-colors mb-6">
+                    1. Infos d'accès
+                  </div>
+                  <div className={cn(
+                    "w-1 h-12 rounded-full transition-all duration-700",
+                    activePhase === 1 ? "bg-primary shadow-[0_0_15px_rgba(227,6,19,0.6)]" : "bg-slate-200"
+                  )} />
+                </div>
+
+                {/* Phase 2 */}
+                <div 
+                  className={cn(
+                    "flex flex-col items-center cursor-pointer group transition-all duration-500",
+                    activePhase === 2 ? "opacity-100" : "opacity-30 hover:opacity-100"
+                  )}
+                  onClick={() => document.getElementById('trigger-phase-2')?.scrollIntoView({ behavior: 'smooth' })}
+                >
+                  <div className="[writing-mode:vertical-rl] rotate-180 whitespace-nowrap text-[11px] font-black uppercase tracking-[0.3em] text-slate-500 group-hover:text-primary transition-colors mb-6">
+                    2. Stats formations
+                  </div>
+                  <div className={cn(
+                    "w-1 h-12 rounded-full transition-all duration-700",
+                    activePhase === 2 ? "bg-primary shadow-[0_0_15px_rgba(227,6,19,0.6)]" : "bg-slate-200"
+                  )} />
+                </div>
+
+                {/* Phase 3 */}
+                <div 
+                  className={cn(
+                    "flex flex-col items-center cursor-pointer group transition-all duration-500",
+                    activePhase === 3 ? "opacity-100" : "opacity-30 hover:opacity-100"
+                  )}
+                  onClick={() => document.getElementById('trigger-phase-3')?.scrollIntoView({ behavior: 'smooth' })}
+                >
+                  <div className="[writing-mode:vertical-rl] rotate-180 whitespace-nowrap text-[11px] font-black uppercase tracking-[0.3em] text-slate-500 group-hover:text-primary transition-colors mb-6">
+                    3. Cartographie
+                  </div>
+                  <div className={cn(
+                    "w-1 h-12 rounded-full transition-all duration-700",
+                    activePhase === 3 ? "bg-primary shadow-[0_0_15px_rgba(227,6,19,0.6)]" : "bg-slate-200"
+                  )} />
+                </div>
+              </div>
+            </aside>
+
+            <div className="space-y-8 relative">
+              <div id="trigger-phase-1" className="absolute top-0 h-1 w-full -z-10" />
+              {loadingDetails && (
               <div className="absolute inset-0 bg-white/40 backdrop-blur-[2px] z-10 flex items-center justify-center rounded-3xl">
                 <div className="flex flex-col items-center gap-4 bg-white p-8 rounded-2xl shadow-xl border border-slate-100">
                   <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
@@ -1024,177 +1114,195 @@ export default function App() {
               </div>
             </div>
 
-            {/* Stats Panel Section */}
-            {onboardingData && (
-              <StatsPanel 
-                data={mapFormations} 
-                userNote={parseFloat(onboardingData.averageBac)}
-                selectedDepartment={geoFilter.department || undefined}
-                selectedCity={geoFilter.city || undefined}
-                selectedFormations={geoFilter.formationTypes}
-                allDataOfSameType={unfilteredMapFormations}
-                allFormationTypes={allFormationTypes}
-                allCities={allCities}
-                allDepartments={allDepartments}
-                onFilterChange={(filters) => setGeoFilter(prev => ({ ...prev, ...filters }))}
-                pageType="general"
-              />
-            )}
+            {/* Phase 2: Stats */}
+            <div 
+              className={cn(
+                "scroll-mt-32 transition-all duration-1000 relative",
+                activePhase < 2 && "grayscale opacity-40 blur-[2px] pointer-events-none"
+              )}
+            >
+              <div id="trigger-phase-2" className="absolute top-0 h-1 w-full -z-10" />
+              {onboardingData && (
+                <StatsPanel 
+                  data={mapFormations} 
+                  userNote={parseFloat(onboardingData.averageBac)}
+                  selectedDepartment={geoFilter.department || undefined}
+                  selectedCity={geoFilter.city || undefined}
+                  selectedFormations={geoFilter.formationTypes}
+                  allDataOfSameType={unfilteredMapFormations}
+                  allFormationTypes={allFormationTypes}
+                  allCities={allCities}
+                  allDepartments={allDepartments}
+                  onFilterChange={(filters) => setGeoFilter(prev => ({ ...prev, ...filters }))}
+                  pageType="general"
+                />
+              )}
+              {/* This trigger activates Phase 3 near the end of Phase 2 (Key Takeaways) */}
+              <div id="trigger-phase-3" className="absolute bottom-32 h-1 w-full -z-10" />
+            </div>
 
-            {/* Map Section */}
-            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm">
-              <div className="p-6 border-b border-slate-100">
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-primary-light rounded-2xl flex items-center justify-center">
-                      <MapPin className="w-6 h-6 text-primary" />
+            {/* Phase 3: Cartographie */}
+            <div 
+              className={cn(
+                "scroll-mt-32 transition-all duration-1000 relative",
+                activePhase < 3 && "grayscale opacity-40 blur-[2px] pointer-events-none"
+              )}
+            >
+              <div className="bg-white rounded-3xl border border-slate-200 shadow-sm">
+                <div className="p-6 border-b border-slate-100">
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 bg-primary-light rounded-2xl flex items-center justify-center">
+                        <MapPin className="w-6 h-6 text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-slate-900">Cartographie de la formation en France</h3>
+                        <p className="text-sm text-slate-500">
+                          {mapFormations.length > 0 
+                            ? `${mapFormations.length} établissement${mapFormations.length > 1 ? 's' : ''} trouvé${mapFormations.length > 1 ? 's' : ''}`
+                            : "Explore les établissements par zone géographique"
+                          }
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="text-xl font-bold text-slate-900">Carte des formations</h3>
-                      <p className="text-sm text-slate-500">
-                        {mapFormations.length > 0 
-                          ? `${mapFormations.length} établissement${mapFormations.length > 1 ? 's' : ''} trouvé${mapFormations.length > 1 ? 's' : ''}`
-                          : "Explore les établissements par zone géographique"
-                        }
-                      </p>
-                    </div>
-                  </div>
 
-                    <div className="flex flex-wrap items-center gap-2">
-                      {(geoFilter.city || geoFilter.department || geoFilter.formationTypes.length > 0 || geoFilter.radius !== 1000) && (
-                        <button 
-                          onClick={() => setGeoFilter({
-                            city: '',
-                            department: '',
-                            formationTypes: [],
-                            radius: 1000,
-                            center: geoFilter.center
-                          })}
-                          className="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-200 transition-colors"
-                        >
-                          Réinitialiser filtres
-                        </button>
-                      )}
-                    <div className="h-8 w-px bg-slate-200 hidden lg:block mx-2" />
-                    <button 
-                      onClick={handleLocateUser}
-                      className="px-4 py-2 bg-primary-light text-primary rounded-xl font-bold text-sm hover:bg-primary hover:text-white transition-all flex items-center gap-2"
-                    >
-                      <Target className="w-4 h-4" />
-                      Ma position
-                    </button>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {(geoFilter.city || geoFilter.department || geoFilter.formationTypes.length > 0 || geoFilter.radius !== 1000) && (
+                          <button 
+                            onClick={() => setGeoFilter({
+                              city: '',
+                              department: '',
+                              formationTypes: [],
+                              radius: 1000,
+                              center: geoFilter.center
+                            })}
+                            className="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-200 transition-colors"
+                          >
+                            Réinitialiser filtres
+                          </button>
+                        )}
+                      <div className="h-8 w-px bg-slate-200 hidden lg:block mx-2" />
+                      <button 
+                        onClick={handleLocateUser}
+                        className="px-4 py-2 bg-primary-light text-primary rounded-xl font-bold text-sm hover:bg-primary hover:text-white transition-all flex items-center gap-2"
+                      >
+                        <Target className="w-4 h-4" />
+                        Ma position
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="h-[550px] w-full relative z-0 overflow-hidden">
-                {geoFilter.formationTypes.length === 0 ? (
-                  <div className="absolute inset-0 z-10 bg-slate-900/5 backdrop-blur-[2px] flex items-center justify-center p-6 text-center">
-                    <div className="bg-white p-8 rounded-3xl shadow-xl border border-slate-100 max-w-sm">
-                      <div className="w-16 h-16 bg-primary-light rounded-2xl flex items-center justify-center mx-auto mb-4">
-                        <Search className="w-8 h-8 text-primary" />
-                      </div>
-                      <h4 className="text-lg font-bold text-slate-900 mb-2">Prêt à explorer ?</h4>
-                      <p className="text-sm text-slate-500 mb-6">
-                        Sélectionne un ou plusieurs types de formation dans le filtre ci-dessous pour les voir sur la carte.
-                      </p>
-                      <div className="flex flex-col gap-2">
-                        <button 
-                          onClick={() => setShowFormationSuggestions(true)}
-                          className="w-full py-2.5 bg-primary text-white rounded-xl font-bold text-sm hover:bg-primary-dark transition-colors"
-                        >
-                          Choisir des formations
-                        </button>
+                <div className="h-[550px] w-full relative z-0 overflow-hidden">
+                  {geoFilter.formationTypes.length === 0 ? (
+                    <div className="absolute inset-0 z-10 bg-slate-900/5 backdrop-blur-[2px] flex items-center justify-center p-6 text-center">
+                      <div className="bg-white p-8 rounded-3xl shadow-xl border border-slate-100 max-w-sm">
+                        <div className="w-16 h-16 bg-primary-light rounded-2xl flex items-center justify-center mx-auto mb-4">
+                          <Search className="w-8 h-8 text-primary" />
+                        </div>
+                        <h4 className="text-lg font-bold text-slate-900 mb-2">Prêt à explorer ?</h4>
+                        <p className="text-sm text-slate-500 mb-6">
+                          Sélectionne un ou plusieurs types de formation dans le filtre ci-dessous pour les voir sur la carte.
+                        </p>
+                        <div className="flex flex-col gap-2">
+                          <button 
+                            onClick={() => setShowFormationSuggestions(true)}
+                            className="w-full py-2.5 bg-primary text-white rounded-xl font-bold text-sm hover:bg-primary-dark transition-colors"
+                          >
+                            Choisir des formations
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ) : null}
-                <MapContainer 
-                  center={geoFilter.center} 
-                  zoom={6} 
-                  style={{ height: '100%', width: '100%' }}
-                  scrollWheelZoom={false}
-                >
-                  <MapUpdater center={geoFilter.center} />
-                  <TileLayer
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                  />
-                  {groupedMapFormations.map((group, idx) => (
-                    <Marker 
-                      key={idx} 
-                      position={group.position}
-                      icon={createMarkerIcon(group.colors, group.formations.length)}
-                    >
-                      <Popup minWidth={250} maxWidth={320}>
-                        <div className="max-h-[350px] overflow-y-auto pr-1 custom-scrollbar">
-                          {group.formations.map((f, fIdx) => (
-                            <div key={fIdx} className={cn("p-1", fIdx > 0 && "mt-4 pt-4 border-t border-slate-200")}>
-                              {group.formations.length > 1 && (
-                                <div className="flex items-center justify-between mb-2">
-                                  <span className="px-1.5 py-0.5 bg-primary-light text-primary text-[9px] font-bold rounded uppercase">
-                                    Formation {fIdx + 1}/{group.formations.length}
-                                  </span>
-                                  <span className="text-[9px] text-slate-400 font-bold uppercase">ID: {f.etablissement.slice(0,3)}...</span>
-                                </div>
-                              )}
-                              <div className="flex items-start gap-2 mb-1">
-                                <div className="w-2 h-2 rounded-full mt-1.5 shrink-0" style={{ backgroundColor: getFormationColor(f.filiere_generale) }} />
-                                <h4 className="font-bold text-slate-900 text-sm">{f.etablissement}</h4>
-                              </div>
-                              <p className="text-xs text-slate-500 mb-1 leading-relaxed">{f.filiere_formation}</p>
-                              <p className="text-xs font-medium text-primary-dark mb-1">{f.selectivite}</p>
-                              <p className="text-xs text-slate-500 mb-2">{f.commune} ({f.departement})</p>
-                              
-                              <div className="grid grid-cols-2 gap-2">
-                                <div className="bg-slate-50 p-2 rounded-lg">
-                                  <span className="block text-[10px] text-slate-400 uppercase font-bold">Taux Accès</span>
-                                  <span className="text-sm font-bold text-primary">
-                                    {f.taux_acces !== null ? `${f.taux_acces}%` : "Inconnu"}
-                                  </span>
-                                </div>
-                                <div className="bg-slate-50 p-2 rounded-lg">
-                                  <span className="block text-[10px] text-slate-400 uppercase font-bold">Capacité</span>
-                                  <span className="text-sm font-bold text-slate-700">{f.capacite}</span>
-                                </div>
-                              </div>
-                              
-                              <div className="mt-2 pt-2 border-t border-slate-100 flex flex-col gap-2">
-                                <span className="text-[10px] text-slate-400 font-medium italic leading-tight block">
-                                  Note moyenne au bac pour les admis: {f.note_moyenne !== null ? `${f.note_moyenne.toFixed(2)}/20` : "N/A"}
-                                </span>
-                                <span className="text-[10px] text-emerald-600 font-bold block">
-                                  Part de boursiers: {f.pct_admis_neo_boursiers !== undefined ? `${f.pct_admis_neo_boursiers}%` : "N/A"}
-                                </span>
-                                {f.lien_parcoursup && (
-                                  <a 
-                                    href={f.lien_parcoursup} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer"
-                                    className="text-[10px] font-black text-primary hover:underline flex items-center gap-1 uppercase tracking-wider"
-                                  >
-                                    Voir sur Parcoursup <ArrowRight className="w-3 h-3" />
-                                  </a>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </Popup>
-                    </Marker>
-                  ))}
-                  {geoFilter.radius < 1000 && (
-                    <Circle 
-                      center={geoFilter.center} 
-                      radius={geoFilter.radius * 1000} 
-                      pathOptions={{ color: '#e30613', fillColor: '#e30613', fillOpacity: 0.1 }} 
+                  ) : null}
+                  <MapContainer 
+                    center={geoFilter.center} 
+                    zoom={6} 
+                    style={{ height: '100%', width: '100%' }}
+                    scrollWheelZoom={false}
+                  >
+                    <MapUpdater center={geoFilter.center} />
+                    <TileLayer
+                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                     />
-                  )}
-                </MapContainer>
+                    {groupedMapFormations.map((group, idx) => (
+                      <Marker 
+                        key={idx} 
+                        position={group.position}
+                        icon={createMarkerIcon(group.colors, group.formations.length)}
+                      >
+                        <Popup minWidth={250} maxWidth={320}>
+                          <div className="max-h-[350px] overflow-y-auto pr-1 custom-scrollbar">
+                            {group.formations.map((f, fIdx) => (
+                              <div key={fIdx} className={cn("p-1", fIdx > 0 && "mt-4 pt-4 border-t border-slate-200")}>
+                                {group.formations.length > 1 && (
+                                  <div className="flex items-center justify-between mb-2">
+                                    <span className="px-1.5 py-0.5 bg-primary-light text-primary text-[9px] font-bold rounded uppercase">
+                                      Formation {fIdx + 1}/{group.formations.length}
+                                    </span>
+                                    <span className="text-[9px] text-slate-400 font-bold uppercase">ID: {f.etablissement.slice(0,3)}...</span>
+                                  </div>
+                                )}
+                                <div className="flex items-start gap-2 mb-1">
+                                  <div className="w-2 h-2 rounded-full mt-1.5 shrink-0" style={{ backgroundColor: getFormationColor(f.filiere_generale) }} />
+                                  <h4 className="font-bold text-slate-900 text-sm">{f.etablissement}</h4>
+                                </div>
+                                <p className="text-xs text-slate-500 mb-1 leading-relaxed">{f.filiere_formation}</p>
+                                <p className="text-xs font-medium text-primary-dark mb-1">{f.selectivite}</p>
+                                <p className="text-xs text-slate-500 mb-2">{f.commune} ({f.departement})</p>
+                                
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div className="bg-slate-50 p-2 rounded-lg">
+                                    <span className="block text-[10px] text-slate-400 uppercase font-bold">Taux Accès</span>
+                                    <span className="text-sm font-bold text-primary">
+                                      {f.taux_acces !== null ? `${f.taux_acces}%` : "Inconnu"}
+                                    </span>
+                                  </div>
+                                  <div className="bg-slate-50 p-2 rounded-lg">
+                                    <span className="block text-[10px] text-slate-400 uppercase font-bold">Capacité</span>
+                                    <span className="text-sm font-bold text-slate-700">{f.capacite}</span>
+                                  </div>
+                                </div>
+                                
+                                <div className="mt-2 pt-2 border-t border-slate-100 flex flex-col gap-2">
+                                  <span className="text-[10px] text-slate-400 font-medium italic leading-tight block">
+                                    Note moyenne au bac pour les admis: {f.note_moyenne !== null ? `${f.note_moyenne.toFixed(2)}/20` : "N/A"}
+                                  </span>
+                                  <span className="text-[10px] text-emerald-600 font-bold block">
+                                    Part de boursiers: {f.pct_admis_neo_boursiers !== undefined ? `${f.pct_admis_neo_boursiers}%` : "N/A"}
+                                  </span>
+                                  {f.lien_parcoursup && (
+                                    <a 
+                                      href={f.lien_parcoursup} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer"
+                                      className="text-[10px] font-black text-primary hover:underline flex items-center gap-1 uppercase tracking-wider"
+                                    >
+                                      Voir sur Parcoursup <ArrowRight className="w-3 h-3" />
+                                    </a>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </Popup>
+                      </Marker>
+                    ))}
+                    {geoFilter.radius < 1000 && (
+                      <Circle 
+                        center={geoFilter.center} 
+                        radius={geoFilter.radius * 1000} 
+                        pathOptions={{ color: '#e30613', fillColor: '#e30613', fillOpacity: 0.1 }} 
+                      />
+                    )}
+                  </MapContainer>
+                </div>
               </div>
             </div>
           </div>
-        ) : (
+        </div>
+      ) : (
           <div className="text-center py-20 bg-white rounded-3xl border-2 border-dashed border-slate-200">
             <LayoutDashboard className="w-16 h-16 text-slate-200 mx-auto mb-4" />
             <h3 className="text-xl font-bold text-slate-900 mb-2">Prêt à commencer ?</h3>
