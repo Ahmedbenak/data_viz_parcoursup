@@ -24,7 +24,8 @@ import {
   Target,
   Building2,
   Navigation,
-  Bell
+  Bell,
+  ArrowLeft
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -167,6 +168,7 @@ export default function App() {
   const [selectedSpecialty, setSelectedSpecialty] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  const [loadingMap, setLoadingMap] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [onboardingComplete, setOnboardingComplete] = useState(false);
   const [onboardingData, setOnboardingData] = useState<OnboardingData | null>(null);
@@ -181,33 +183,33 @@ export default function App() {
   // Phase tracking for sidebar guide
   const [activePhase, setActivePhase] = useState<1 | 2 | 3>(1);
 
-  // Scroll spy for phase tracking
+  // Scroll spy for phase tracking using IntersectionObserver
   useEffect(() => {
     if (!selectedSpecialty) return;
 
-    const handleScroll = () => {
-      const vh = window.innerHeight;
-      const threshold = vh * 0.4; // 40% of viewport height
-
-      // Check phases from bottom to top
-      const p3 = document.getElementById('trigger-phase-3');
-      const p2 = document.getElementById('trigger-phase-2');
-      const p1 = document.getElementById('trigger-phase-1');
-
-      if (p3 && p3.getBoundingClientRect().top < threshold) {
-        setActivePhase(3);
-      } else if (p2 && p2.getBoundingClientRect().top < threshold) {
-        setActivePhase(2);
-      } else if (p1) {
-        setActivePhase(1);
-      }
+    const options = {
+      root: null,
+      rootMargin: '-10% 0px -70% 0px', // Trigger when section is in top part of viewport
+      threshold: 0
     };
 
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    // Initial check
-    handleScroll();
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          if (entry.target.id === 'section-phase-1') setActivePhase(1);
+          if (entry.target.id === 'section-phase-2') setActivePhase(2);
+          if (entry.target.id === 'section-phase-3') setActivePhase(3);
+        }
+      });
+    }, options);
 
-    return () => window.removeEventListener('scroll', handleScroll);
+    const sections = ['section-phase-1', 'section-phase-2', 'section-phase-3'];
+    sections.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) observer.observe(el);
+    });
+
+    return () => observer.disconnect();
   }, [selectedSpecialty]);
   
   // Table Filters & Sorting
@@ -248,6 +250,25 @@ export default function App() {
   const [showCitySuggestions, setShowCitySuggestions] = useState(false);
   const [allDepartments, setAllDepartments] = useState<string[]>([]);
   const [showDeptSuggestions, setShowDeptSuggestions] = useState(false);
+
+  const handleReset = useCallback(() => {
+    setBacType(null);
+    setSelectedSpecialty('');
+    setOnboardingComplete(false);
+    setOnboardingData(null);
+    setSearchQuery('');
+    setGeoFilter({
+      city: '',
+      department: '',
+      formationTypes: [] as string[],
+      radius: 1000,
+      center: [46.603354, 1.888334] as [number, number]
+    });
+    setData([]);
+    setMapSpecificData([]);
+    // We scroll top top to ensure a fresh start
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
 
   const handleLocateUser = () => {
     if (navigator.geolocation) {
@@ -332,6 +353,7 @@ export default function App() {
       }
       
       try {
+        setLoadingMap(true);
         const supabase = getSupabase();
         let allP2Data: any[] = [];
         let from = 0;
@@ -350,6 +372,39 @@ export default function App() {
           if (error) throw error;
           if (data && data.length > 0) {
             allP2Data = [...allP2Data, ...data];
+            
+            // Map and update state progressively every 2 pages or at the end
+            if (allP2Data.length % (PAGE_SIZE * 2) === 0 || data.length < PAGE_SIZE) {
+              setMapSpecificData(allP2Data.map(row => ({
+                filiere_generale: row.filiere_generale || "",
+                filiere_formation: row.filiere_formation || "",
+                etablissement: row.etablissement || "",
+                commune: row.commune || "",
+                departement: row.departement || "",
+                region: row.region || "",
+                coordonnees_gps: row.coordonnees_gps || "",
+                eff_admis: Number(row.eff_admis || 0),
+                eff_admis_neo: Number(row.eff_admis_neo || 0),
+                capacite: Number(row.capacite || 0),
+                taux_acces: (row.taux_acces === "nd" || row.taux_acces === null || row.taux_acces === "") ? null : parseFloat(row.taux_acces),
+                note_moyenne: (row.note_moyenne === null || row.note_moyenne === "" || isNaN(Number(row.note_moyenne))) ? null : Number(row.note_moyenne),
+                selectivite: row.selectivite || "",
+                pct_admis_neo_gen: Number(row["pct_admis_neo_gen"] || 0),
+                pct_admis_neo_techno: Number(row["pct_admis_neo_techno"] || 0),
+                pct_admis_neo_pro: Number(row["pct_admis_neo_pro"] || 0),
+                lien_parcoursup: row.lien_parcoursup || "",
+                pct_boursiers: Number(row.pct_boursiers || 0),
+                pct_admis_neo_boursiers: Number(row.pct_admis_neo_boursiers || 0),
+                eff_admis_boursiers_neo: Number(row.eff_admis_boursiers_neo || 0),
+                pct_admises_filles: Number(row.pct_admises_filles || 0),
+                pct_admis_neo_sans_mention: Number(row.pct_admis_neo_sans_mention || 0),
+                pct_admis_neo_mention_ab: Number(row.pct_admis_neo_mention_ab || 0),
+                pct_admis_neo_mention_b: Number(row.pct_admis_neo_mention_b || 0),
+                pct_admis_neo_mention_tb: Number(row.pct_admis_neo_mention_tb || 0),
+                pct_admis_neo_mention_tbf: Number(row.pct_admis_neo_mention_tbf || 0),
+              })));
+            }
+
             if (data.length < PAGE_SIZE) {
               hasMore = false;
             } else {
@@ -359,39 +414,10 @@ export default function App() {
             hasMore = false;
           }
         }
-
-        if (allP2Data.length > 0) {
-            setMapSpecificData(allP2Data.map(row => ({
-              filiere_generale: row.filiere_generale || "",
-              filiere_formation: row.filiere_formation || "",
-              etablissement: row.etablissement || "",
-              commune: row.commune || "",
-              departement: row.departement || "",
-              region: row.region || "",
-              coordonnees_gps: row.coordonnees_gps || "",
-              eff_admis: Number(row.eff_admis || 0),
-              eff_admis_neo: Number(row.eff_admis_neo || 0),
-              capacite: Number(row.capacite || 0),
-              taux_acces: (row.taux_acces === "nd" || row.taux_acces === null || row.taux_acces === "") ? null : parseFloat(row.taux_acces),
-              note_moyenne: (row.note_moyenne === null || row.note_moyenne === "" || isNaN(Number(row.note_moyenne))) ? null : Number(row.note_moyenne),
-              selectivite: row.selectivite || "",
-              pct_admis_neo_gen: Number(row["pct_admis_neo_gen"] || 0),
-              pct_admis_neo_techno: Number(row["pct_admis_neo_techno"] || 0),
-              pct_admis_neo_pro: Number(row["pct_admis_neo_pro"] || 0),
-              lien_parcoursup: row.lien_parcoursup || "",
-              pct_boursiers: Number(row.pct_boursiers || 0),
-              pct_admis_neo_boursiers: Number(row.pct_admis_neo_boursiers || 0),
-              eff_admis_boursiers_neo: Number(row.eff_admis_boursiers_neo || 0),
-              pct_admises_filles: Number(row.pct_admises_filles || 0),
-              pct_admis_neo_sans_mention: Number(row.pct_admis_neo_sans_mention || 0),
-              pct_admis_neo_mention_ab: Number(row.pct_admis_neo_mention_ab || 0),
-              pct_admis_neo_mention_b: Number(row.pct_admis_neo_mention_b || 0),
-              pct_admis_neo_mention_tb: Number(row.pct_admis_neo_mention_tb || 0),
-              pct_admis_neo_mention_tbf: Number(row.pct_admis_neo_mention_tbf || 0),
-            })));
-        }
       } catch (err) {
         console.error("Error loading map data:", err);
+      } finally {
+        setLoadingMap(false);
       }
     };
     
@@ -665,7 +691,7 @@ export default function App() {
   }
 
   if (bacType === 'pro') {
-    return <ProPage onBack={() => setBacType(null)} onboardingData={onboardingData} setOnboardingComplete={setOnboardingComplete} />;
+    return <ProPage onBack={handleReset} onboardingData={onboardingData} setOnboardingComplete={setOnboardingComplete} />;
   }
 
   if (bacType === 'techno') {
@@ -684,7 +710,7 @@ export default function App() {
             Cette section est en cours de préparation. Reviens bientôt pour découvrir les statistiques d'admission des séries technologiques !
           </p>
           <button 
-            onClick={() => setBacType(null)}
+            onClick={handleReset}
             className="px-8 py-3 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-colors"
           >
             Retour à l'accueil
@@ -696,22 +722,47 @@ export default function App() {
 
   if (!onboardingComplete) {
     return (
-      <OnboardingQuestionnaire 
-        onComplete={handleOnboardingComplete} 
-        specialties={specialties}
-        individualSpecialties={individualSpecialties}
-        loadingSpecialties={loading}
-        allFormationTypes={allFormationTypes}
-        allDepartments={allDepartments}
-      />
+      <div className="relative min-h-screen bg-slate-50">
+        {/* Floating Back Button */}
+        <div className="fixed top-28 left-8 z-[100] no-print">
+          <button 
+            onClick={handleReset}
+            className="flex items-center gap-2 px-5 py-2.5 bg-slate-900/90 backdrop-blur-sm text-white rounded-full font-bold shadow-xl hover:bg-slate-800 transition-all hover:scale-105 active:scale-95 group border border-white/20 text-sm"
+          >
+            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+            <span>Retour à l'accueil</span>
+          </button>
+        </div>
+
+        <OnboardingQuestionnaire 
+          onComplete={handleOnboardingComplete} 
+          specialties={specialties}
+          individualSpecialties={individualSpecialties}
+          loadingSpecialties={loading}
+          allFormationTypes={allFormationTypes}
+          allDepartments={allDepartments}
+        />
+      </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-primary-light selection:text-primary">
-      <Header onboardingData={onboardingData} setOnboardingComplete={setOnboardingComplete} onHome={() => setBacType(null)} />
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-primary-light selection:text-primary relative">
+      <Header onboardingData={onboardingData} setOnboardingComplete={setOnboardingComplete} onHome={handleReset} />
       
+      {/* Floating Back Button */}
+      <div className="fixed top-28 left-8 z-[100] no-print">
+        <button 
+          onClick={handleReset}
+          className="flex items-center gap-2 px-5 py-2.5 bg-slate-900/90 backdrop-blur-sm text-white rounded-full font-bold shadow-xl hover:bg-slate-800 transition-all hover:scale-105 active:scale-95 group border border-white/20 text-sm"
+        >
+          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+          <span>Retour à l'accueil</span>
+        </button>
+      </div>
+
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+
         {/* Hero / Selection */}
         <section className="mb-16 text-center max-w-4xl mx-auto">
           <motion.div
@@ -830,10 +881,10 @@ export default function App() {
                     "flex flex-col items-center cursor-pointer group transition-all duration-500",
                     activePhase === 1 ? "opacity-100" : "opacity-30 hover:opacity-100"
                   )}
-                  onClick={() => document.getElementById('trigger-phase-1')?.scrollIntoView({ behavior: 'smooth' })}
+                  onClick={() => document.getElementById('section-phase-1')?.scrollIntoView({ behavior: 'smooth' })}
                 >
                   <div className="[writing-mode:vertical-rl] rotate-180 whitespace-nowrap text-[13px] font-black uppercase tracking-[0.25em] text-slate-500 group-hover:text-primary transition-colors mb-6">
-                    1. Taux d'Accès parcoursup pour tes spécialités
+                    1. Synthèse Admission
                   </div>
                   <div className={cn(
                     "w-1 h-12 rounded-full transition-all duration-700",
@@ -847,10 +898,10 @@ export default function App() {
                     "flex flex-col items-center cursor-pointer group transition-all duration-500",
                     activePhase === 2 ? "opacity-100" : "opacity-30 hover:opacity-100"
                   )}
-                  onClick={() => document.getElementById('trigger-phase-2')?.scrollIntoView({ behavior: 'smooth' })}
+                  onClick={() => document.getElementById('section-phase-2')?.scrollIntoView({ behavior: 'smooth' })}
                 >
                   <div className="[writing-mode:vertical-rl] rotate-180 whitespace-nowrap text-[13px] font-black uppercase tracking-[0.25em] text-slate-500 group-hover:text-primary transition-colors mb-6">
-                    2. STATISTIQUES SUR LA FORMATION VISÉE
+                    2. Comparaison Régionale
                   </div>
                   <div className={cn(
                     "w-1 h-12 rounded-full transition-all duration-700",
@@ -864,10 +915,10 @@ export default function App() {
                     "flex flex-col items-center cursor-pointer group transition-all duration-500",
                     activePhase === 3 ? "opacity-100" : "opacity-30 hover:opacity-100"
                   )}
-                  onClick={() => document.getElementById('trigger-phase-3')?.scrollIntoView({ behavior: 'smooth' })}
+                  onClick={() => document.getElementById('section-phase-3')?.scrollIntoView({ behavior: 'smooth' })}
                 >
                   <div className="[writing-mode:vertical-rl] rotate-180 whitespace-nowrap text-[13px] font-black uppercase tracking-[0.25em] text-slate-500 group-hover:text-primary transition-colors mb-6">
-                    3. Cartographie
+                    3. Carte Interactive
                   </div>
                   <div className={cn(
                     "w-1 h-12 rounded-full transition-all duration-700",
@@ -877,8 +928,7 @@ export default function App() {
               </div>
             </aside>
 
-            <div className="space-y-8 relative">
-              <div id="trigger-phase-1" className="absolute top-0 h-1 w-full -z-10" />
+            <div id="section-phase-1" className="space-y-8 relative scroll-mt-32">
               {loadingDetails && (
               <div className="absolute inset-0 bg-white/40 backdrop-blur-[2px] z-10 flex items-center justify-center rounded-3xl">
                 <div className="flex flex-col items-center gap-4 bg-white p-8 rounded-2xl shadow-xl border border-slate-100">
@@ -1115,17 +1165,18 @@ export default function App() {
               </div>
             </div>
 
-            {/* Phase 2: Stats */}
+            {/* Phase 2: Comparisons */}
             <div 
+              id="section-phase-2"
               className={cn(
                 "scroll-mt-32 transition-all duration-1000 relative",
                 activePhase < 2 && "grayscale opacity-40 blur-[2px] pointer-events-none"
               )}
             >
-              <div id="trigger-phase-2" className="absolute top-0 h-1 w-full -z-10" />
               {onboardingData && (
                 <StatsPanel 
                   data={mapFormations} 
+                  loading={loadingMap}
                   userNote={parseFloat(onboardingData.averageBac)}
                   selectedDepartment={geoFilter.department || onboardingData?.department || undefined}
                   selectedCity={geoFilter.city || undefined}
@@ -1138,12 +1189,11 @@ export default function App() {
                   pageType="general"
                 />
               )}
-              {/* This trigger activates Phase 3 near the end of Phase 2 (Key Takeaways) */}
-              <div id="trigger-phase-3" className="absolute bottom-32 h-1 w-full -z-10" />
             </div>
 
             {/* Phase 3: Cartographie */}
             <div 
+              id="section-phase-3"
               className={cn(
                 "scroll-mt-32 transition-all duration-1000 relative",
                 activePhase < 3 && "grayscale opacity-40 blur-[2px] pointer-events-none"

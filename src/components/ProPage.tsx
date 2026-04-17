@@ -20,7 +20,8 @@ import {
   ArrowRight,
   Building2,
   X,
-  Bell
+  Bell,
+  ArrowLeft
 } from 'lucide-react';
 import { 
   LineChart, 
@@ -547,8 +548,20 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
   return (
     <div className="min-h-screen bg-slate-50 pb-20">
       <Header onboardingData={onboardingData} setOnboardingComplete={setOnboardingComplete} onHome={onBack} />
+      
+      {/* Floating Back Button */}
+      <div className="fixed top-28 left-8 z-[100] no-print">
+        <button 
+          onClick={onBack}
+          className="flex items-center gap-2 px-5 py-2.5 bg-slate-900/90 backdrop-blur-sm text-white rounded-full font-bold shadow-xl hover:bg-slate-800 transition-all hover:scale-105 active:scale-95 group border border-white/20 text-sm"
+        >
+          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+          <span>Retour à l'accueil</span>
+        </button>
+      </div>
 
       <main className="max-w-7xl mx-auto px-6 sm:px-10 py-12">
+
         {/* Bac Pro Selection Bar */}
         <div className="mb-12">
           <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-soft relative z-10">

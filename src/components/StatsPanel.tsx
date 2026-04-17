@@ -96,6 +96,7 @@ interface StatsPanelProps {
   allDepartments: string[];
   onFilterChange: (filters: { city?: string; department?: string; formationTypes?: string[] }) => void;
   pageType: 'general' | 'pro';
+  loading?: boolean;
 }
 
 export default function StatsPanel({ 
@@ -109,7 +110,8 @@ export default function StatsPanel({
   allCities,
   allDepartments,
   onFilterChange,
-  pageType 
+  pageType,
+  loading = false
 }: StatsPanelProps) {
   const [localUserNote, setLocalUserNote] = useState<number | null>(userNote || null);
   const [inputValue, setInputValue] = useState<string>(userNote ? userNote.toString() : '');
@@ -172,6 +174,9 @@ export default function StatsPanel({
       if (filterBar) (filterBar as HTMLElement).style.display = 'none';
       noPrintBtns.forEach(btn => (btn as HTMLElement).style.display = 'none');
       
+      // Small delay to ensure React finishes re-rendering in "export" mode
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
       const dataUrl = await toPng(element, {
         quality: 0.95,
         backgroundColor: '#f8fafc', // match slate-50 background
@@ -205,14 +210,6 @@ export default function StatsPanel({
 
   // Filter out NaN note_moyenne
   const validData = useMemo(() => data.filter(d => d.note_moyenne !== null), [data]);
-  const nationalData = useMemo(() => allDataOfSameType.filter(d => d.note_moyenne !== null), [allDataOfSameType]);
-
-  // Specific data for the selected department (extracted from national pool)
-  const departmentalData = useMemo(() => {
-    if (!selectedDepartment) return [];
-    return nationalData.filter(d => d.departement.toLowerCase() === selectedDepartment.toLowerCase());
-  }, [nationalData, selectedDepartment]);
-
   // Overview Stats
   const overview = useMemo(() => {
     const totalPlaces = validData.reduce((acc, curr) => acc + curr.capacite, 0);
@@ -297,28 +294,55 @@ export default function StatsPanel({
 
   // National Averages for comparison
   const nationalProfile = useMemo(() => {
-    if (nationalData.length === 0) return null;
-    const avg = (arr: number[]) => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+    const validNational = allDataOfSameType.filter(d => d.note_moyenne !== null);
+    if (validNational.length === 0) return null;
     
+    let sumNote = 0;
+    let sumTaux = 0;
+    let sumNeoGen = 0;
+    
+    for (const d of validNational) {
+      sumNote += d.note_moyenne!;
+      sumTaux += (d.taux_acces || 0);
+      sumNeoGen += (d.pct_admis_neo_gen || 0);
+    }
+    
+    const count = validNational.length;
     return {
-      meanNote: avg(nationalData.map(d => d.note_moyenne!)),
-      tauxAcces: avg(nationalData.map(d => d.taux_acces || 0)),
-      neoGen: avg(nationalData.map(d => d.pct_admis_neo_gen)),
+      meanNote: sumNote / count,
+      tauxAcces: sumTaux / count,
+      neoGen: sumNeoGen / count,
     };
-  }, [nationalData]);
+  }, [allDataOfSameType]);
 
   // Local/Departmental Profile for comparison
   const departmentalProfile = useMemo(() => {
-    if (departmentalData.length === 0) return null;
-    const avg = (arr: number[]) => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+    if (!selectedDepartment) return null;
+    const departmentalData = allDataOfSameType.filter(d => 
+      d.departement.toLowerCase() === selectedDepartment.toLowerCase() && 
+      d.note_moyenne !== null
+    );
     
+    if (departmentalData.length === 0) return null;
+    
+    let sumNote = 0;
+    let sumTaux = 0;
+    let sumNeoGen = 0;
+    
+    for (const d of departmentalData) {
+      sumNote += d.note_moyenne!;
+      sumTaux += (d.taux_acces || 0);
+      sumNeoGen += (d.pct_admis_neo_gen || 0);
+    }
+    
+    const count = departmentalData.length;
     return {
-      meanNote: avg(departmentalData.map(d => d.note_moyenne!)),
-      tauxAcces: avg(departmentalData.map(d => d.taux_acces || 0)),
-      neoGen: avg(departmentalData.map(d => d.pct_admis_neo_gen)),
-      count: departmentalData.length
+      meanNote: sumNote / count,
+      tauxAcces: sumTaux / count,
+      neoGen: sumNeoGen / count,
+      count
     };
-  }, [departmentalData]);
+  }, [allDataOfSameType, selectedDepartment]);
 
   const bacChartData = {
     labels: ['Général', 'Techno', 'Pro'],
@@ -618,8 +642,9 @@ export default function StatsPanel({
         {/* Overview Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
         <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
+          initial={isExporting ? false : { opacity: 0, y: 20 }}
+          animate={isExporting ? { opacity: 1, y: 0 } : undefined}
+          whileInView={isExporting ? undefined : { opacity: 1, y: 0 }}
           viewport={{ once: true }}
           whileHover={{ y: -10, shadow: "var(--shadow-hover)" }}
           className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-soft transition-all"
@@ -635,8 +660,9 @@ export default function StatsPanel({
         </motion.div>
 
         <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
+          initial={isExporting ? false : { opacity: 0, y: 20 }}
+          animate={isExporting ? { opacity: 1, y: 0 } : undefined}
+          whileInView={isExporting ? undefined : { opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ delay: 0.1 }}
           whileHover={{ y: -10, shadow: "var(--shadow-hover)" }}
@@ -653,8 +679,9 @@ export default function StatsPanel({
         </motion.div>
 
         <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
+          initial={isExporting ? false : { opacity: 0, y: 20 }}
+          animate={isExporting ? { opacity: 1, y: 0 } : undefined}
+          whileInView={isExporting ? undefined : { opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ delay: 0.2 }}
           whileHover={{ y: -10, shadow: "var(--shadow-hover)" }}
@@ -937,78 +964,87 @@ export default function StatsPanel({
           </div>
 
           <div className="flex-1 flex flex-col space-y-6">
-            {[
-              { 
-                label: "Formations", 
-                val: departmentalProfile?.count || 0, 
-                nat: nationalData.length,
-                desc: "Nombre total d'établissements proposant ces filières dans la zone."
-              },
-              { 
-                label: "Note moyenne admis", 
-                val: departmentalProfile?.meanNote || 0, 
-                nat: nationalProfile?.meanNote || 0, 
-                isNote: true, 
-                hasStar: true,
-                desc: "Note moyenne calculée sur la base des différentes mentions obtenues*"
-              },
-              { 
-                label: "Taux d'accès moyen", 
-                val: Math.round(departmentalProfile?.tauxAcces || 0), 
-                nat: Math.round(nationalProfile?.tauxAcces || 0), 
-                isPct: true,
-                desc: "Pourcentage moyen de candidats ayant reçu une proposition d'admission."
-              },
-              { 
-                label: "% Bac Général", 
-                val: Math.round(departmentalProfile?.neoGen || 0), 
-                nat: Math.round(nationalProfile?.neoGen || 0), 
-                isPct: true,
-                desc: "Part des bacheliers généraux parmi l'ensemble des admis."
-              }
-            ].map((item, i) => (
-              <motion.div 
-                key={i}
-                initial={{ opacity: 0, x: 20 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.1 }}
-                className="bg-slate-50 border border-slate-100 rounded-[2rem] p-6 group hover:bg-white hover:shadow-xl hover:scale-[1.02] transition-all duration-300"
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">{item.label}</span>
-                </div>
-                
-                <div className="flex items-end justify-between gap-4">
-                  <div className="flex flex-col">
-                    <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">National</span>
-                    <div className="text-2xl font-black text-slate-900 tracking-tighter">
-                      {item.isNote ? item.nat.toFixed(1) : item.nat}{item.isPct ? '%' : ''}
-                    </div>
+            {loading && !nationalProfile ? (
+              <div className="flex-1 flex flex-col items-center justify-center space-y-4 py-20">
+                <Loader2 className="w-12 h-12 text-primary animate-spin" />
+                <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">Calcul des statistiques nationales...</p>
+              </div>
+            ) : (
+              [
+                { 
+                  label: "Formations", 
+                  val: departmentalProfile?.count || 0, 
+                  nat: allDataOfSameType.length,
+                  desc: "Nombre total d'établissements proposant ces filières dans la zone."
+                },
+                { 
+                  label: "Note moyenne admis", 
+                  val: departmentalProfile?.meanNote || 0, 
+                  nat: nationalProfile?.meanNote || 0, 
+                  isNote: true, 
+                  hasStar: true,
+                  desc: "Note moyenne calculée sur la base des différentes mentions obtenues*"
+                },
+                { 
+                  label: "Taux d'accès moyen", 
+                  val: Math.round(departmentalProfile?.tauxAcces || 0), 
+                  nat: Math.round(nationalProfile?.tauxAcces || 0), 
+                  isPct: true,
+                  desc: "Pourcentage moyen de candidats ayant reçu une proposition d'admission."
+                },
+                { 
+                  label: "% Bac Général", 
+                  val: Math.round(departmentalProfile?.neoGen || 0), 
+                  nat: Math.round(nationalProfile?.neoGen || 0), 
+                  isPct: true,
+                  desc: "Part des bacheliers généraux parmi l'ensemble des admis."
+                }
+              ].map((item, i) => (
+                <motion.div 
+                  key={i}
+                  initial={isExporting ? false : { opacity: 0, x: 20 }}
+                  animate={isExporting ? { opacity: 1, x: 0 } : undefined}
+                  whileInView={isExporting ? undefined : { opacity: 1, x: 0 }}
+                  transition={{ delay: isExporting ? 0 : i * 0.1 }}
+                  className="bg-slate-50 border border-slate-100 rounded-[2rem] p-6 group hover:bg-white hover:shadow-xl hover:scale-[1.02] transition-all duration-300"
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">{item.label}</span>
                   </div>
-
-                  {selectedDepartment && (
-                    <div className="flex flex-col text-right">
-                      <span className="text-[9px] font-black text-primary/60 uppercase tracking-widest mb-1">{selectedDepartment}</span>
-                      <div className="text-4xl font-black text-primary tracking-tighter">
-                        {item.isNote ? item.val.toFixed(1) : item.val}{item.isPct ? '%' : ''}
-                        {item.hasStar && <span className="text-xl ml-1">*</span>}
+                  
+                  <div className="flex items-end justify-between gap-4">
+                    <div className="flex flex-col">
+                      <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">National</span>
+                      <div className="text-2xl font-black text-slate-900 tracking-tighter">
+                        {item.isNote ? item.nat.toFixed(1) : item.nat}{item.isPct ? '%' : ''}
                       </div>
                     </div>
-                  )}
-                </div>
 
-                <div className="mt-4 pt-4 border-t border-slate-200/50">
-                  <p className="text-[10px] text-slate-500 font-bold leading-relaxed opacity-80 italic">
-                    {item.desc}
-                  </p>
-                </div>
-              </motion.div>
-            ))}
+                    {selectedDepartment && (
+                      <div className="flex flex-col text-right">
+                        <span className="text-[9px] font-black text-primary/60 uppercase tracking-widest mb-1">{selectedDepartment}</span>
+                        <div className="text-4xl font-black text-primary tracking-tighter">
+                          {item.isNote ? item.val.toFixed(1) : item.val}{item.isPct ? '%' : ''}
+                          {item.hasStar && <span className="text-xl ml-1">*</span>}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mt-4 pt-4 border-t border-slate-200/50">
+                    <p className="text-[10px] text-slate-500 font-bold leading-relaxed opacity-80 italic">
+                      {item.desc}
+                    </p>
+                  </div>
+                </motion.div>
+              ))
+            )}
 
             {selectedDepartment && (
               <motion.div 
-                initial={{ opacity: 0 }}
-                whileInView={{ opacity: 1 }}
+                initial={isExporting ? false : { opacity: 0 }}
+                animate={isExporting ? { opacity: 1 } : undefined}
+                whileInView={isExporting ? undefined : { opacity: 1 }}
                 className="mt-4 p-6 bg-slate-900 rounded-[2.5rem] border border-white/5 shadow-2xl"
               >
                 <div className="flex items-start gap-4">
