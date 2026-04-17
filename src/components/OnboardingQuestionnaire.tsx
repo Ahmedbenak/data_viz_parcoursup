@@ -4,7 +4,8 @@ import {
   Check, 
   ChevronRight, 
   Search,
-  GraduationCap
+  GraduationCap,
+  MapPin
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -19,6 +20,7 @@ interface OnboardingProps {
   individualSpecialties: string[];
   loadingSpecialties: boolean;
   allFormationTypes: string[];
+  allDepartments: string[];
 }
 
 export interface OnboardingData {
@@ -27,19 +29,30 @@ export interface OnboardingData {
   specialty: string;
   averageBac: string;
   targetFormationTypes: string[];
+  department: string;
 }
 
-export default function OnboardingQuestionnaire({ onComplete, specialties, individualSpecialties, loadingSpecialties, allFormationTypes }: OnboardingProps) {
+export default function OnboardingQuestionnaire({ 
+  onComplete, 
+  specialties, 
+  individualSpecialties, 
+  loadingSpecialties, 
+  allFormationTypes,
+  allDepartments
+}: OnboardingProps) {
   const [data, setData] = useState<OnboardingData>({
     specialty1: '',
     specialty2: '',
     specialty: '',
     averageBac: '',
-    targetFormationTypes: []
+    targetFormationTypes: [],
+    department: ''
   });
   const [search1, setSearch1] = useState('');
   const [search2, setSearch2] = useState('');
+  const [deptSearch, setDeptSearch] = useState('');
   const [showFormationSuggestions, setShowFormationSuggestions] = useState(false);
+  const [showDeptSuggestions, setShowDeptSuggestions] = useState(false);
 
   const filtered1 = individualSpecialties.filter(s => 
     s.toLowerCase().includes(search1.toLowerCase())
@@ -48,6 +61,10 @@ export default function OnboardingQuestionnaire({ onComplete, specialties, indiv
   const filtered2 = individualSpecialties.filter(s => 
     s.toLowerCase().includes(search2.toLowerCase()) && s !== data.specialty1
   );
+
+  const filteredDepts = allDepartments.filter(d => 
+    d.toLowerCase().includes(deptSearch.toLowerCase())
+  ).slice(0, 10);
 
   const isValidCombination = React.useMemo(() => {
     if (!data.specialty1 || !data.specialty2) return false;
@@ -294,6 +311,56 @@ export default function OnboardingQuestionnaire({ onComplete, specialties, indiv
                     )}
                   </div>
                 </div>
+
+                {/* Home Department */}
+                <div className="flex flex-col gap-4">
+                  <label className="flex items-center gap-3 text-xs font-black text-slate-400 uppercase tracking-[0.2em]">
+                    <div className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-[11px] shadow-lg shadow-primary/20">5</div>
+                    Ton département de résidence
+                  </label>
+                  <div className="relative group">
+                    <MapPin className="absolute left-6 top-1/2 -translate-y-1/2 w-6 h-6 text-slate-400 group-focus-within:text-primary transition-colors" />
+                    <input 
+                      type="text"
+                      placeholder="Sélectionne ton département..."
+                      value={deptSearch}
+                      onChange={(e) => {
+                        setDeptSearch(e.target.value);
+                        setShowDeptSuggestions(true);
+                      }}
+                      onFocus={() => setShowDeptSuggestions(true)}
+                      className="w-full pl-16 pr-8 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all text-lg font-bold shadow-sm"
+                    />
+                    
+                    {showDeptSuggestions && (
+                      <>
+                        <div className="fixed inset-0 z-[100]" onClick={() => setShowDeptSuggestions(false)} />
+                        <div className="absolute bottom-full mb-4 left-0 right-0 bg-white border border-slate-200 rounded-[2rem] shadow-2xl z-[110] overflow-hidden">
+                          {filteredDepts.length > 0 ? (
+                            filteredDepts.map((dept, i) => (
+                              <button
+                                key={i}
+                                onClick={() => {
+                                  setData({ ...data, department: dept });
+                                  setDeptSearch(dept);
+                                  setShowDeptSuggestions(false);
+                                }}
+                                className={cn(
+                                  "w-full px-8 py-4 text-left text-sm font-bold transition-all flex items-center gap-4",
+                                  data.department === dept ? "bg-primary-light text-primary" : "text-slate-600 hover:bg-slate-50"
+                                )}
+                              >
+                                {dept}
+                              </button>
+                            ))
+                          ) : (
+                            <div className="px-8 py-4 text-sm text-slate-400 italic">Aucun département trouvé</div>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
               </div>
               
               <div className="flex flex-col lg:flex-row items-center justify-between gap-10">
@@ -314,7 +381,7 @@ export default function OnboardingQuestionnaire({ onComplete, specialties, indiv
                   whileHover={{ scale: 1.02, y: -2 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={handleComplete}
-                  disabled={!isValidCombination || !isAverageValid || data.targetFormationTypes.length === 0}
+                  disabled={!isValidCombination || !isAverageValid || data.targetFormationTypes.length === 0 || !data.department}
                   className="w-full lg:w-auto bg-primary text-white px-16 py-6 rounded-[2rem] font-black text-xl hover:bg-primary-hover transition-all flex items-center justify-center gap-4 shadow-2xl shadow-primary/30 active:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:grayscale disabled:shadow-none"
                 >
                   Analyser mon profil <ChevronRight className="w-6 h-6" />

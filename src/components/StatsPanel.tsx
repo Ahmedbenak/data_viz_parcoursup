@@ -207,6 +207,12 @@ export default function StatsPanel({
   const validData = useMemo(() => data.filter(d => d.note_moyenne !== null), [data]);
   const nationalData = useMemo(() => allDataOfSameType.filter(d => d.note_moyenne !== null), [allDataOfSameType]);
 
+  // Specific data for the selected department (extracted from national pool)
+  const departmentalData = useMemo(() => {
+    if (!selectedDepartment) return [];
+    return nationalData.filter(d => d.departement.toLowerCase() === selectedDepartment.toLowerCase());
+  }, [nationalData, selectedDepartment]);
+
   // Overview Stats
   const overview = useMemo(() => {
     const totalPlaces = validData.reduce((acc, curr) => acc + curr.capacite, 0);
@@ -300,6 +306,19 @@ export default function StatsPanel({
       neoGen: avg(nationalData.map(d => d.pct_admis_neo_gen)),
     };
   }, [nationalData]);
+
+  // Local/Departmental Profile for comparison
+  const departmentalProfile = useMemo(() => {
+    if (departmentalData.length === 0) return null;
+    const avg = (arr: number[]) => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+    
+    return {
+      meanNote: avg(departmentalData.map(d => d.note_moyenne!)),
+      tauxAcces: avg(departmentalData.map(d => d.taux_acces || 0)),
+      neoGen: avg(departmentalData.map(d => d.pct_admis_neo_gen)),
+      count: departmentalData.length
+    };
+  }, [departmentalData]);
 
   const bacChartData = {
     labels: ['Général', 'Techno', 'Pro'],
@@ -908,46 +927,105 @@ export default function StatsPanel({
 
         {/* Comparison Section (Right) */}
         <div className="bg-white p-10 md:p-12 rounded-[4rem] border border-slate-100 shadow-soft flex flex-col">
-          <div className="flex items-center justify-between mb-12">
+          <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 bg-slate-50 rounded-[1.25rem] flex items-center justify-center">
                 <MapPin className="w-7 h-7 text-slate-600" />
               </div>
               <h4 className="text-3xl font-black text-slate-900 tracking-tight">Comparaison</h4>
             </div>
-            {selectedDepartment && (
-              <div className="px-5 py-2 bg-primary-light text-primary rounded-full text-xs font-black uppercase tracking-[0.15em] border border-primary/10">
-                {selectedDepartment}
-              </div>
-            )}
           </div>
 
-          <div className="flex-1 flex flex-col justify-center space-y-12">
-            <div className={cn("grid gap-y-10", selectedDepartment ? "grid-cols-2 gap-x-12" : "grid-cols-1")}>
-              <div className={cn("grid text-center pb-6 border-b border-slate-100", selectedDepartment ? "col-span-2 grid-cols-2" : "grid-cols-1")}>
-                <div className="text-xs font-black text-slate-400 uppercase tracking-[0.3em]">National</div>
-                {selectedDepartment && (
-                  <div className="text-xs font-black text-primary uppercase tracking-[0.3em]">{selectedDepartment}</div>
-                )}
-              </div>
-
-              {[
-                { label: "Formations", val: validData.length, nat: nationalData.length },
-                { label: "Note moyenne admis", val: profile?.meanNote || 0, nat: nationalProfile?.meanNote || 0, isNote: true },
-                { label: "Taux d'accès moyen", val: Math.round(profile?.tauxAcces || 0), nat: Math.round(nationalProfile?.tauxAcces || 0), isPct: true },
-                { label: "% Bac Général", val: Math.round(profile?.neoGen || 0), nat: Math.round(nationalProfile?.neoGen || 0), isPct: true }
-              ].map((item, i) => (
-                <React.Fragment key={i}>
-                  <div className={cn("text-center text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mt-4", selectedDepartment ? "col-span-2" : "col-span-1")}>{item.label}</div>
-                  <div className={cn("text-3xl font-black text-center tracking-tighter", selectedDepartment ? "text-slate-400" : "text-slate-900")}>
-                    {item.isNote ? item.nat.toFixed(1) : item.nat}{item.isPct ? '%' : ''}
+          <div className="flex-1 flex flex-col space-y-6">
+            {[
+              { 
+                label: "Formations", 
+                val: departmentalProfile?.count || 0, 
+                nat: nationalData.length,
+                desc: "Nombre total d'établissements proposant ces filières dans la zone."
+              },
+              { 
+                label: "Note moyenne admis", 
+                val: departmentalProfile?.meanNote || 0, 
+                nat: nationalProfile?.meanNote || 0, 
+                isNote: true, 
+                hasStar: true,
+                desc: "Note moyenne calculée sur la base des différentes mentions obtenues*"
+              },
+              { 
+                label: "Taux d'accès moyen", 
+                val: Math.round(departmentalProfile?.tauxAcces || 0), 
+                nat: Math.round(nationalProfile?.tauxAcces || 0), 
+                isPct: true,
+                desc: "Pourcentage moyen de candidats ayant reçu une proposition d'admission."
+              },
+              { 
+                label: "% Bac Général", 
+                val: Math.round(departmentalProfile?.neoGen || 0), 
+                nat: Math.round(nationalProfile?.neoGen || 0), 
+                isPct: true,
+                desc: "Part des bacheliers généraux parmi l'ensemble des admis."
+              }
+            ].map((item, i) => (
+              <motion.div 
+                key={i}
+                initial={{ opacity: 0, x: 20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.1 }}
+                className="bg-slate-50 border border-slate-100 rounded-[2rem] p-6 group hover:bg-white hover:shadow-xl hover:scale-[1.02] transition-all duration-300"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">{item.label}</span>
+                </div>
+                
+                <div className="flex items-end justify-between gap-4">
+                  <div className="flex flex-col">
+                    <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">National</span>
+                    <div className="text-2xl font-black text-slate-900 tracking-tighter">
+                      {item.isNote ? item.nat.toFixed(1) : item.nat}{item.isPct ? '%' : ''}
+                    </div>
                   </div>
+
                   {selectedDepartment && (
-                    <div className="text-3xl font-black text-primary text-center tracking-tighter">{item.isNote ? item.val.toFixed(1) : item.val}{item.isPct ? '%' : ''}</div>
+                    <div className="flex flex-col text-right">
+                      <span className="text-[9px] font-black text-primary/60 uppercase tracking-widest mb-1">{selectedDepartment}</span>
+                      <div className="text-4xl font-black text-primary tracking-tighter">
+                        {item.isNote ? item.val.toFixed(1) : item.val}{item.isPct ? '%' : ''}
+                        {item.hasStar && <span className="text-xl ml-1">*</span>}
+                      </div>
+                    </div>
                   )}
-                </React.Fragment>
-              ))}
-            </div>
+                </div>
+
+                <div className="mt-4 pt-4 border-t border-slate-200/50">
+                  <p className="text-[10px] text-slate-500 font-bold leading-relaxed opacity-80 italic">
+                    {item.desc}
+                  </p>
+                </div>
+              </motion.div>
+            ))}
+
+            {selectedDepartment && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                whileInView={{ opacity: 1 }}
+                className="mt-4 p-6 bg-slate-900 rounded-[2.5rem] border border-white/5 shadow-2xl"
+              >
+                <div className="flex items-start gap-4">
+                  <div className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
+                    <span className="text-white font-black text-lg">*</span>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-[10px] text-slate-300 font-bold leading-relaxed uppercase tracking-wider">
+                      Barème de calcul des mentions :
+                    </p>
+                    <p className="text-[10px] text-slate-400 font-medium leading-relaxed">
+                      "Très bien (+ félicitations)" = 18, "Très bien" = 18, "Bien" = 15, "Assez bien" = 13, Sans mention = 11
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+            )}
 
             {!selectedDepartment && (
               <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-dashed border-slate-200 text-center">

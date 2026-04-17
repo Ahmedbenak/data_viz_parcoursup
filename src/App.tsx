@@ -702,6 +702,7 @@ export default function App() {
         individualSpecialties={individualSpecialties}
         loadingSpecialties={loading}
         allFormationTypes={allFormationTypes}
+        allDepartments={allDepartments}
       />
     );
   }
@@ -831,8 +832,8 @@ export default function App() {
                   )}
                   onClick={() => document.getElementById('trigger-phase-1')?.scrollIntoView({ behavior: 'smooth' })}
                 >
-                  <div className="[writing-mode:vertical-rl] rotate-180 whitespace-nowrap text-[11px] font-black uppercase tracking-[0.3em] text-slate-500 group-hover:text-primary transition-colors mb-6">
-                    1. Infos d'accès
+                  <div className="[writing-mode:vertical-rl] rotate-180 whitespace-nowrap text-[13px] font-black uppercase tracking-[0.25em] text-slate-500 group-hover:text-primary transition-colors mb-6">
+                    1. Taux d'Accès parcoursup pour tes spécialités
                   </div>
                   <div className={cn(
                     "w-1 h-12 rounded-full transition-all duration-700",
@@ -848,8 +849,8 @@ export default function App() {
                   )}
                   onClick={() => document.getElementById('trigger-phase-2')?.scrollIntoView({ behavior: 'smooth' })}
                 >
-                  <div className="[writing-mode:vertical-rl] rotate-180 whitespace-nowrap text-[11px] font-black uppercase tracking-[0.3em] text-slate-500 group-hover:text-primary transition-colors mb-6">
-                    2. Stats formations
+                  <div className="[writing-mode:vertical-rl] rotate-180 whitespace-nowrap text-[13px] font-black uppercase tracking-[0.25em] text-slate-500 group-hover:text-primary transition-colors mb-6">
+                    2. STATISTIQUES SUR LA FORMATION VISÉE
                   </div>
                   <div className={cn(
                     "w-1 h-12 rounded-full transition-all duration-700",
@@ -865,7 +866,7 @@ export default function App() {
                   )}
                   onClick={() => document.getElementById('trigger-phase-3')?.scrollIntoView({ behavior: 'smooth' })}
                 >
-                  <div className="[writing-mode:vertical-rl] rotate-180 whitespace-nowrap text-[11px] font-black uppercase tracking-[0.3em] text-slate-500 group-hover:text-primary transition-colors mb-6">
+                  <div className="[writing-mode:vertical-rl] rotate-180 whitespace-nowrap text-[13px] font-black uppercase tracking-[0.25em] text-slate-500 group-hover:text-primary transition-colors mb-6">
                     3. Cartographie
                   </div>
                   <div className={cn(
@@ -1126,7 +1127,7 @@ export default function App() {
                 <StatsPanel 
                   data={mapFormations} 
                   userNote={parseFloat(onboardingData.averageBac)}
-                  selectedDepartment={geoFilter.department || undefined}
+                  selectedDepartment={geoFilter.department || onboardingData?.department || undefined}
                   selectedCity={geoFilter.city || undefined}
                   selectedFormations={geoFilter.formationTypes}
                   allDataOfSameType={unfilteredMapFormations}
