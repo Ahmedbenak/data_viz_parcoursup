@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { getSupabase } from './lib/supabase';
 import { 
   BarChart, 
@@ -25,7 +25,8 @@ import {
   Building2,
   Navigation,
   Bell,
-  ArrowLeft
+  ArrowLeft,
+  X
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -98,6 +99,7 @@ interface OrientationData {
 interface Parcoursup2Data {
   filiere_generale: string;
   filiere_formation: string;
+  filiere_detaillee?: string;
   etablissement: string;
   commune: string;
   departement: string;
@@ -151,12 +153,44 @@ function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
 
 import Header from './components/Header';
 
-function MapUpdater({ center }: { center: [number, number] }) {
+function MapUpdater({ center, zoom, department, formations }: { center: [number, number], zoom: number, department?: string, formations: any[] }) {
   const map = useMap();
+  
   useEffect(() => {
-    map.setView(center, map.getZoom());
-  }, [center, map]);
+    // 1. If we have a specific department, focus on it
+    if (department && formations.length > 0 && center[0] === 46.603354) {
+      const departmentMarkers = formations.filter(f => 
+        f.departement.toLowerCase() === department.toLowerCase() && f.position
+      );
+      
+      if (departmentMarkers.length > 0) {
+        const bounds = L.latLngBounds(departmentMarkers.map(f => f.position));
+        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 11 });
+        return;
+      }
+    }
+    
+    // 2. Otherwise use the center and zoom provided
+    map.setView(center, zoom);
+  }, [center, zoom, department, formations, map]);
+  
   return null;
+}
+
+function MarkerWithAutoPopup({ position, icon, children, timestamp }: { position: [number, number], icon: any, children: React.ReactNode, timestamp: number | null }) {
+  const markerRef = useRef<L.Marker>(null);
+  
+  useEffect(() => {
+    if (timestamp && markerRef.current) {
+      markerRef.current.openPopup();
+    }
+  }, [timestamp]);
+  
+  return (
+    <Marker ref={markerRef} position={position} icon={icon}>
+      {children}
+    </Marker>
+  );
 }
 
 export default function App() {
@@ -224,11 +258,13 @@ export default function App() {
     city: '',
     department: '',
     formationTypes: [] as string[],
-    radius: 1000, // km (France entière par défaut)
-    center: [46.603354, 1.888334] as [number, number] // France center
+    radius: 1000, 
+    center: [46.603354, 1.888334] as [number, number],
+    zoom: 6
   });
 
   const [showFormationSuggestions, setShowFormationSuggestions] = useState(false);
+  const [targetFormation, setTargetFormation] = useState<{data: Parcoursup2Data, timestamp: number} | null>(null);
 
   // Dynamic Color Mapping based on all loaded formation types
   const typeColorMap = useMemo(() => {
@@ -262,7 +298,8 @@ export default function App() {
       department: '',
       formationTypes: [] as string[],
       radius: 1000,
-      center: [46.603354, 1.888334] as [number, number]
+      center: [46.603354, 1.888334] as [number, number],
+      zoom: 6
     });
     setData([]);
     setMapSpecificData([]);
@@ -275,7 +312,8 @@ export default function App() {
       navigator.geolocation.getCurrentPosition((position) => {
         setGeoFilter(prev => ({
           ...prev,
-          center: [position.coords.latitude, position.coords.longitude]
+          center: [position.coords.latitude, position.coords.longitude],
+          zoom: 12
         }));
       }, (err) => {
         console.error("Geolocation error:", err);
@@ -283,6 +321,36 @@ export default function App() {
       });
     } else {
       alert("La géolocalisation n'est pas supportée par ton navigateur.");
+    }
+  };
+
+  const handleShowOnMap = (formation: Parcoursup2Data) => {
+    setTargetFormation({ data: formation, timestamp: Date.now() });
+    const coords = formation.coordonnees_gps.split(',').map(c => parseFloat(c.trim()));
+    if (coords.length === 2 && !isNaN(coords[0]) && !isNaN(coords[1])) {
+      setGeoFilter(prev => ({
+        ...prev,
+        center: [coords[0], coords[1]] as [number, number],
+        zoom: 13, // Reduced zoom from 15 to 13 as per user request
+        radius: 1000, 
+        department: formation.departement 
+      }));
+      
+      // Select the formation type automatically if not already selected
+      if (!geoFilter.formationTypes.includes(formation.filiere_generale)) {
+        setGeoFilter(prev => ({
+          ...prev,
+          formationTypes: [...prev.formationTypes, formation.filiere_generale]
+        }));
+      }
+
+      // Smooth scroll to map section
+      setTimeout(() => {
+        const mapSection = document.getElementById('section-phase-3');
+        if (mapSection) {
+          mapSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
     }
   };
 
@@ -378,6 +446,7 @@ export default function App() {
               setMapSpecificData(allP2Data.map(row => ({
                 filiere_generale: row.filiere_generale || "",
                 filiere_formation: row.filiere_formation || "",
+                filiere_detaillee: row.filiere_detaillee || "",
                 etablissement: row.etablissement || "",
                 commune: row.commune || "",
                 departement: row.departement || "",
@@ -481,13 +550,14 @@ export default function App() {
     }
     setFilterAverage(data.averageBac);
     
-    // Pre-fill formation types filter
-    if (data.targetFormationTypes && data.targetFormationTypes.length > 0) {
-      setGeoFilter(prev => ({
-        ...prev,
-        formationTypes: data.targetFormationTypes
-      }));
-    }
+    // Pre-fill geography and formation types filters
+    setGeoFilter(prev => ({
+      ...prev,
+      department: data.department || '',
+      formationTypes: data.targetFormationTypes && data.targetFormationTypes.length > 0 
+        ? data.targetFormationTypes 
+        : prev.formationTypes
+    }));
     
     setOnboardingComplete(true);
   };
@@ -837,6 +907,7 @@ export default function App() {
               <span className="text-xs font-bold uppercase tracking-widest">Filtres de ton profil</span>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-4">
+              {/* Average Bac */}
               <div className="flex items-center gap-3 px-4 py-2 bg-white rounded-2xl border border-slate-200 shadow-sm hover:border-emerald-200 transition-all">
                 <div className="w-8 h-8 bg-emerald-50 rounded-lg flex items-center justify-center">
                   <TrendingUp className="w-4 h-4 text-emerald-600" />
@@ -855,10 +926,30 @@ export default function App() {
                 </div>
               </div>
 
-              {(filterAverage !== onboardingData?.averageBac) && (
+              {/* Department */}
+              {geoFilter.department && (
+                <div className="flex items-center gap-3 px-4 py-2 bg-white rounded-2xl border border-slate-200 shadow-sm hover:border-blue-200 transition-all">
+                  <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
+                    <MapPin className="w-4 h-4 text-blue-600" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Zone</span>
+                    <span className="text-sm font-bold text-blue-700">{geoFilter.department}</span>
+                  </div>
+                  <button 
+                    onClick={() => setGeoFilter(prev => ({ ...prev, department: '' }))}
+                    className="ml-1 p-1 hover:bg-slate-100 rounded-full text-slate-400 transition-colors"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
+
+              {(filterAverage !== onboardingData?.averageBac || geoFilter.department !== (onboardingData?.department || '')) && (
                 <button 
                   onClick={() => {
                     setFilterAverage(onboardingData?.averageBac || '');
+                    setGeoFilter(prev => ({ ...prev, department: onboardingData?.department || '' }));
                   }}
                   className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-slate-400 hover:text-primary transition-all hover:bg-primary-light rounded-xl"
                 >
@@ -1177,8 +1268,8 @@ export default function App() {
                 <StatsPanel 
                   data={mapFormations} 
                   loading={loadingMap}
-                  userNote={parseFloat(onboardingData.averageBac)}
-                  selectedDepartment={geoFilter.department || onboardingData?.department || undefined}
+                  userNote={parseFloat(filterAverage)}
+                  selectedDepartment={geoFilter.department || undefined}
                   selectedCity={geoFilter.city || undefined}
                   selectedFormations={geoFilter.formationTypes}
                   allDataOfSameType={unfilteredMapFormations}
@@ -1186,6 +1277,7 @@ export default function App() {
                   allCities={allCities}
                   allDepartments={allDepartments}
                   onFilterChange={(filters) => setGeoFilter(prev => ({ ...prev, ...filters }))}
+                  onShowOnMap={handleShowOnMap}
                   pageType="general"
                 />
               )}
@@ -1272,18 +1364,31 @@ export default function App() {
                     style={{ height: '100%', width: '100%' }}
                     scrollWheelZoom={false}
                   >
-                    <MapUpdater center={geoFilter.center} />
+                    <MapUpdater 
+                      center={geoFilter.center} 
+                      zoom={geoFilter.zoom}
+                      department={geoFilter.department} 
+                      formations={mapFormations} 
+                    />
                     <TileLayer
                       attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                       url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                     />
-                    {groupedMapFormations.map((group, idx) => (
-                      <Marker 
-                        key={idx} 
-                        position={group.position}
-                        icon={createMarkerIcon(group.colors, group.formations.length)}
-                      >
-                        <Popup minWidth={250} maxWidth={320}>
+                    {groupedMapFormations.map((group, idx) => {
+                      const targeted = targetFormation && group.formations.some(f => 
+                        f.etablissement === targetFormation.data.etablissement && 
+                        f.filiere_formation === targetFormation.data.filiere_formation &&
+                        f.coordonnees_gps === targetFormation.data.coordonnees_gps
+                      );
+
+                      return (
+                        <MarkerWithAutoPopup 
+                          key={idx} 
+                          position={group.position}
+                          icon={createMarkerIcon(group.colors, group.formations.length)}
+                          timestamp={targeted ? targetFormation.timestamp : null}
+                        >
+                          <Popup minWidth={250} maxWidth={320}>
                           <div className="max-h-[350px] overflow-y-auto pr-1 custom-scrollbar">
                             {group.formations.map((f, fIdx) => (
                               <div key={fIdx} className={cn("p-1", fIdx > 0 && "mt-4 pt-4 border-t border-slate-200")}>
@@ -1300,6 +1405,7 @@ export default function App() {
                                   <h4 className="font-bold text-slate-900 text-sm">{f.etablissement}</h4>
                                 </div>
                                 <p className="text-xs text-slate-500 mb-1 leading-relaxed">{f.filiere_formation}</p>
+                                {f.filiere_detaillee && <p className="text-[10px] italic text-primary font-medium mb-1">{f.filiere_detaillee}</p>}
                                 <p className="text-xs font-medium text-primary-dark mb-1">{f.selectivite}</p>
                                 <p className="text-xs text-slate-500 mb-2">{f.commune} ({f.departement})</p>
                                 
@@ -1338,8 +1444,9 @@ export default function App() {
                             ))}
                           </div>
                         </Popup>
-                      </Marker>
-                    ))}
+                        </MarkerWithAutoPopup>
+                      );
+                    })}
                     {geoFilter.radius < 1000 && (
                       <Circle 
                         center={geoFilter.center} 

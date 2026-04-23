@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { motion } from 'motion/react';
 import { 
   Briefcase, 
@@ -112,12 +112,44 @@ function deg2rad(deg: number) {
   return deg * (Math.PI / 180);
 }
 
-function MapUpdater({ center }: { center: [number, number] }) {
+function MapUpdater({ center, zoom, department, formations }: { center: [number, number], zoom: number, department?: string, formations: any[] }) {
   const map = useMap();
+  
   useEffect(() => {
-    map.setView(center);
-  }, [center, map]);
+    // 1. If we have a specific department, focus on it
+    if (department && formations.length > 0 && center[0] === 46.603354) {
+      const departmentMarkers = formations.filter(f => 
+        f.departement.toLowerCase() === department.toLowerCase() && f.position
+      );
+      
+      if (departmentMarkers.length > 0) {
+        const bounds = L.latLngBounds(departmentMarkers.map(f => f.position));
+        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 11 });
+        return;
+      }
+    }
+    
+    // 2. Otherwise use the center and zoom provided
+    map.setView(center, zoom);
+  }, [center, zoom, department, formations, map]);
+  
   return null;
+}
+
+function MarkerWithAutoPopup({ position, icon, children, timestamp }: { position: [number, number], icon: any, children: React.ReactNode, timestamp: number | null }) {
+  const markerRef = useRef<L.Marker>(null);
+  
+  useEffect(() => {
+    if (timestamp && markerRef.current) {
+      markerRef.current.openPopup();
+    }
+  }, [timestamp]);
+  
+  return (
+    <Marker ref={markerRef} position={position} icon={icon}>
+      {children}
+    </Marker>
+  );
 }
 
 import { Skeleton, CardSkeleton } from './Skeleton';
@@ -162,12 +194,14 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
   const [showCitySuggestions, setShowCitySuggestions] = useState(false);
   const [showDeptSuggestions, setShowDeptSuggestions] = useState(false);
   const [showFormationSuggestions, setShowFormationSuggestions] = useState(false);
+  const [targetFormation, setTargetFormation] = useState<{data: any, timestamp: number} | null>(null);
   const [geoFilter, setGeoFilter] = useState({
     center: [46.603354, 1.888334] as [number, number],
+    zoom: 6,
     radius: 1000,
     city: '',
-    department: '',
-    formationTypes: [] as string[]
+    department: onboardingData?.department || '',
+    formationTypes: onboardingData?.targetFormationTypes || [] as string[]
   });
 
   // Dynamic Color Mapping based on all loaded formation types
@@ -403,6 +437,7 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
             return {
               filiere_generale: row.filiere_generale || "",
               filiere_formation: row.filiere_formation || "",
+              filiere_detaillee: row.filiere_detaillee || "",
               etablissement: row.etablissement || "",
               commune: row.commune || "",
               departement: row.departement || "",
@@ -505,6 +540,35 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
           center: [position.coords.latitude, position.coords.longitude]
         }));
       });
+    }
+  };
+
+  const handleShowOnMap = (formation: any) => {
+    setTargetFormation({ data: formation, timestamp: Date.now() });
+    const coords = (formation.coordonnees_gps || "").split(',').map((c: string) => parseFloat(c.trim()));
+    if (coords.length === 2 && !isNaN(coords[0]) && !isNaN(coords[1])) {
+      setGeoFilter(prev => ({
+        ...prev,
+        center: [coords[0], coords[1]] as [number, number],
+        zoom: 13,
+        radius: 1000,
+        department: formation.departement
+      }));
+      
+      if (!geoFilter.formationTypes.includes(formation.filiere_generale)) {
+        setGeoFilter(prev => ({
+          ...prev,
+          formationTypes: [...prev.formationTypes, formation.filiere_generale]
+        }));
+      }
+
+      setTimeout(() => {
+        // Need to check the ID of map section in ProPage
+        const mapSection = document.getElementById('section-geo-pro'); 
+        if (mapSection) {
+          mapSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
     }
   };
 
@@ -796,7 +860,7 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
         </div>
 
         {/* Map Section */}
-        <div className="mb-12">
+        <div id="section-geo-pro" className="mb-12">
           <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="p-6 border-b border-slate-100">
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
@@ -866,22 +930,35 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
               ) : null}
               <MapContainer 
                 center={geoFilter.center} 
-                zoom={6} 
+                zoom={geoFilter.zoom} 
                 style={{ height: '100%', width: '100%' }}
                 scrollWheelZoom={false}
               >
-                <MapUpdater center={geoFilter.center} />
+                <MapUpdater 
+                  center={geoFilter.center} 
+                  zoom={geoFilter.zoom}
+                  department={geoFilter.department} 
+                  formations={mapData} 
+                />
                 <TileLayer
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
-                {groupedMapData.map((group, idx) => (
-                  <Marker 
-                    key={idx} 
-                    position={group.position}
-                    icon={createMarkerIcon(group.colors, group.formations.length)}
-                  >
-                    <Popup minWidth={250} maxWidth={320}>
+                {groupedMapData.map((group, idx) => {
+                  const targeted = targetFormation && group.formations.some(f => 
+                    f.etablissement === targetFormation.data.etablissement && 
+                    f.filiere_formation === targetFormation.data.filiere_formation &&
+                    f.coordonnees_gps === targetFormation.data.coordonnees_gps
+                  );
+
+                  return (
+                    <MarkerWithAutoPopup 
+                      key={idx} 
+                      position={group.position}
+                      icon={createMarkerIcon(group.colors, group.formations.length)}
+                      timestamp={targeted ? targetFormation.timestamp : null}
+                    >
+                      <Popup minWidth={250} maxWidth={320}>
                       <div className="max-h-[350px] overflow-y-auto pr-1 custom-scrollbar">
                         {group.formations.map((f: any, fIdx: number) => (
                           <div key={fIdx} className={cn("p-1", fIdx > 0 && "mt-4 pt-4 border-t border-slate-200")}>
@@ -898,6 +975,7 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
                               <h4 className="font-bold text-slate-900 text-sm">{f.etablissement}</h4>
                             </div>
                             <p className="text-xs text-slate-500 mb-1 leading-relaxed">{f.filiere_formation}</p>
+                            {f.filiere_detaillee && <p className="text-[10px] italic text-primary font-medium mb-1">{f.filiere_detaillee}</p>}
                             <p className="text-xs font-medium text-primary-dark mb-1">{f.selectivite}</p>
                             <p className="text-xs text-slate-500 mb-2">{f.commune} ({f.departement})</p>
                             
@@ -939,8 +1017,9 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
                         ))}
                       </div>
                     </Popup>
-                  </Marker>
-                ))}
+                    </MarkerWithAutoPopup>
+                  );
+                })}
                 {geoFilter.radius < 1000 && (
                   <Circle 
                     center={geoFilter.center} 
@@ -967,6 +1046,7 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
           allCities={allCities}
           allDepartments={allDepartments}
           onFilterChange={(filters) => setGeoFilter(prev => ({ ...prev, ...filters }))}
+          onShowOnMap={handleShowOnMap}
           pageType="pro"
         />
 

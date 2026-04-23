@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { motion } from 'motion/react';
 import jsPDF from 'jspdf';
 import { toPng } from 'html-to-image';
@@ -32,8 +33,10 @@ import {
   Building2,
   X,
   FileDown,
-  Loader2
+  Loader2,
+  ExternalLink
 } from 'lucide-react';
+import { AnimatePresence } from 'motion/react';
 
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -58,6 +61,7 @@ ChartJS.register(
 interface Parcoursup2Data {
   filiere_generale: string;
   filiere_formation: string;
+  filiere_detaillee?: string;
   etablissement: string;
   commune: string;
   departement: string;
@@ -95,6 +99,7 @@ interface StatsPanelProps {
   allCities: string[];
   allDepartments: string[];
   onFilterChange: (filters: { city?: string; department?: string; formationTypes?: string[] }) => void;
+  onShowOnMap?: (formation: Parcoursup2Data) => void;
   pageType: 'general' | 'pro';
   loading?: boolean;
 }
@@ -110,6 +115,7 @@ export default function StatsPanel({
   allCities,
   allDepartments,
   onFilterChange,
+  onShowOnMap,
   pageType,
   loading = false
 }: StatsPanelProps) {
@@ -253,11 +259,17 @@ export default function StatsPanel({
     };
 
     return {
-      accessible: calcStats(accessible),
-      level: calcStats(level),
-      ambitious: calcStats(ambitious),
+      accessible: { ...calcStats(accessible), items: accessible },
+      level: { ...calcStats(level), items: level },
+      ambitious: { ...calcStats(ambitious), items: ambitious },
     };
   }, [validData, localUserNote]);
+
+  const [viewingSegment, setViewingSegment] = useState<{
+    label: string;
+    items: Parcoursup2Data[];
+    color: string;
+  } | null>(null);
 
   // Profile Averages
   const profile = useMemo(() => {
@@ -445,6 +457,142 @@ export default function StatsPanel({
           </div>
         )}
       </div>
+
+      {createPortal(
+        <AnimatePresence>
+          {viewingSegment && (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 md:p-8">
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setViewingSegment(null)}
+                className="absolute inset-0 bg-slate-900/40 backdrop-blur-md"
+              />
+              <motion.div 
+                initial={{ opacity: 0, y: 100, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 100, scale: 0.95 }}
+                className="relative w-full max-w-4xl bg-white rounded-[3rem] shadow-2xl overflow-hidden flex flex-col max-h-[85vh] z-10"
+              >
+                <div className="p-8 border-b border-slate-100 flex items-center justify-between">
+                  {/* ... same modal content ... */}
+                  <div className="flex items-center gap-4">
+                    <div 
+                      className="w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg"
+                      style={{ backgroundColor: viewingSegment.color }}
+                    >
+                      <Building2 className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-black text-slate-900 tracking-tight">
+                        {viewingSegment.label === 'Ambitieux' ? 'Formations Ambitieuses' : 
+                         viewingSegment.label === 'Sécure' ? 'Formations Sécures' : 
+                         viewingSegment.label === 'Réaliste' ? 'Formations Réalistes' : 
+                         `Formations ${viewingSegment.label}`}
+                      </h3>
+                      <p className="text-sm text-slate-500 font-bold uppercase tracking-widest">{viewingSegment.items.length} formations trouvées</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setViewingSegment(null)}
+                    className="w-12 h-12 bg-slate-50 hover:bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400 transition-colors"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-8 pt-4 custom-scrollbar">
+                  {viewingSegment.items.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {viewingSegment.items.map((item, idx) => (
+                        <motion.div
+                          key={idx}
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: idx * 0.05 }}
+                          className="group bg-slate-50 border border-slate-100 p-6 rounded-2xl hover:bg-white hover:shadow-xl hover:border-primary/20 transition-all flex flex-col justify-between"
+                        >
+                          <div>
+                            <div className="flex items-start justify-between gap-4 mb-3">
+                              <h4 className="text-sm font-black text-slate-900 line-clamp-2 leading-tight group-hover:text-primary transition-colors">
+                                {item.etablissement}
+                              </h4>
+                              <div className="flex gap-2 shrink-0">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (onShowOnMap) onShowOnMap(item);
+                                    setViewingSegment(null);
+                                  }}
+                                  className="p-2 bg-white border border-slate-100 rounded-lg text-primary hover:bg-primary hover:text-white transition-all shadow-sm"
+                                  title="Affiche sur la carte"
+                                >
+                                  <MapPin className="w-4 h-4" />
+                                </button>
+                                {item.lien_parcoursup && (
+                                  <a
+                                    href={item.lien_parcoursup}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="p-2 bg-white border border-slate-100 rounded-lg text-slate-400 hover:text-primary hover:border-primary transition-all shadow-sm"
+                                    title="Voir sur Parcoursup"
+                                  >
+                                    <ExternalLink className="w-4 h-4" />
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                            
+                            {item.filiere_detaillee && (
+                              <p className="text-[11px] font-bold text-primary-dark mb-3 line-clamp-1 opacity-80 italic">
+                                {item.filiere_detaillee}
+                              </p>
+                            )}
+
+                            <div className="flex items-center gap-2 text-[11px] text-slate-400 font-bold mb-4">
+                              <MapPin className="w-3 h-3" />
+                              {item.commune} ({item.departement})
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center justify-between pt-4 border-t border-slate-200/50">
+                            <div className="flex flex-col">
+                              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-tight">Note moyenne des intégrés</span>
+                              <span className="text-base font-black text-slate-900">{item.note_moyenne?.toFixed(1)} <span className="text-xs text-slate-300">/ 20</span></span>
+                            </div>
+                            <div className="flex flex-col text-right">
+                              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Places</span>
+                              <span className="text-base font-black text-slate-900">{item.capacite}</span>
+                            </div>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="py-20 flex flex-col items-center justify-center text-center">
+                      <div className="w-20 h-20 bg-slate-50 rounded-[2rem] flex items-center justify-center mb-6">
+                        <Search className="w-10 h-10 text-slate-200" />
+                      </div>
+                      <h4 className="text-xl font-black text-slate-900 tracking-tight mb-2">Aucune formation disponible</h4>
+                      <p className="text-slate-500 font-medium max-w-sm">
+                        Désolé, nous n'avons trouvé aucune formation correspondant à la catégorie <span className="font-bold">{viewingSegment.label}</span> pour ta recherche actuelle.
+                      </p>
+                      <button 
+                        onClick={() => setViewingSegment(null)}
+                        className="mt-8 px-8 py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/20"
+                      >
+                        Retourner au tableau de bord
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
 
       {/* Dynamic Filter Bar */}
       <div className="dynamic-filter-bar bg-white p-4 rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-200/50 flex flex-wrap items-center gap-4 relative z-50">
@@ -813,6 +961,7 @@ export default function StatsPanel({
                 <Target className="w-7 h-7 text-emerald-600" />
               </div>
               <h4 className="text-3xl font-black text-slate-900 tracking-tight">Ton Potentiel</h4>
+              <p className="text-sm font-bold text-slate-400 mt-1">change ta moyenne attendue pour voir tes chances d'accès aux formations</p>
             </div>
             {localUserNote !== null && (
               <div className="flex items-center gap-4">
@@ -877,24 +1026,30 @@ export default function StatsPanel({
             <div className="grid grid-cols-1 gap-6">
               {[
                 { 
+                  id: 'accessible',
                   label: 'Sécure', 
                   count: segments.accessible.count, 
+                  items: segments.accessible.items,
                   color: 'emerald', 
                   icon: CheckCircle2,
                   desc: "Ta note est supérieure à la moyenne des admis.",
                   advice: "C'est ton filet de sécurité."
                 },
                 { 
+                  id: 'level',
                   label: 'Réaliste', 
                   count: segments.level.count, 
+                  items: segments.level.items,
                   color: 'amber', 
                   icon: Info,
                   desc: "Ta note correspond exactement au profil type.",
                   advice: "Tes chances sont très sérieuses."
                 },
                 { 
+                  id: 'ambitious',
                   label: 'Ambitieux', 
                   count: segments.ambitious.count, 
+                  items: segments.ambitious.items,
                   color: 'rose', 
                   icon: AlertTriangle,
                   desc: "Ta note est un peu juste par rapport aux admis.",
@@ -905,33 +1060,54 @@ export default function StatsPanel({
                   key={i} 
                   whileHover={{ x: 5 }}
                   className={cn(
-                    "p-6 rounded-[2rem] border transition-all flex items-center gap-6",
-                    seg.color === 'emerald' ? "bg-emerald-50/30 border-emerald-100" :
-                    seg.color === 'amber' ? "bg-amber-50/30 border-amber-100" :
-                    "bg-rose-50/30 border-rose-100"
+                    "p-5 rounded-[2.5rem] border transition-all flex flex-col sm:flex-row items-center gap-4 sm:gap-6",
+                    seg.color === 'emerald' ? "bg-emerald-50/20 border-emerald-100" :
+                    seg.color === 'amber' ? "bg-amber-50/20 border-amber-100" :
+                    "bg-rose-50/20 border-rose-100"
                   )}
                 >
                   <div className={cn(
-                    "w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 shadow-soft",
-                    seg.color === 'emerald' ? "bg-emerald-500 text-white" :
-                    seg.color === 'amber' ? "bg-amber-400 text-white" :
-                    "bg-rose-500 text-white"
+                    "w-12 h-12 rounded-[1rem] flex items-center justify-center shrink-0 shadow-sm",
+                    seg.color === 'emerald' ? "bg-white text-emerald-600 border border-emerald-100" :
+                    seg.color === 'amber' ? "bg-white text-amber-600 border border-amber-100" :
+                    "bg-white text-rose-600 border border-rose-100"
                   )}>
-                    <seg.icon className="w-7 h-7" />
+                    <seg.icon className="w-6 h-6" />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className={cn("text-xs font-black uppercase tracking-[0.2em]", `text-${seg.color}-600`)}>
+                  <div className="flex-1 min-w-0 text-center sm:text-left">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-1">
+                      <span className={cn("text-[10px] font-black uppercase tracking-[0.2em] px-2 py-0.5 rounded-full self-center sm:self-start", 
+                        seg.color === 'emerald' ? "bg-emerald-100 text-emerald-700" :
+                        seg.color === 'amber' ? "bg-amber-100 text-amber-700" :
+                        "bg-rose-100 text-rose-700"
+                      )}>
                         {seg.label}
                       </span>
-                      <span className="text-2xl font-black text-slate-900 tracking-tighter">
+                      <span className="text-xl font-black text-slate-900 tracking-tighter">
                         {seg.count} <span className="text-[10px] text-slate-400 uppercase font-bold tracking-normal">formations</span>
                       </span>
                     </div>
-                    <p className="text-sm text-slate-600 font-medium leading-snug">
-                      {seg.desc} <span className="text-slate-400 italic block mt-1">{seg.advice}</span>
+                    <p className="text-xs text-slate-600 font-medium leading-relaxed">
+                      {seg.desc} <span className="text-slate-400 italic sm:ml-1">{seg.advice}</span>
                     </p>
                   </div>
+                  
+                  <button 
+                    onClick={() => setViewingSegment({ 
+                      label: seg.label, 
+                      items: seg.items, 
+                      color: seg.color === 'emerald' ? '#10b981' : seg.color === 'amber' ? '#f59e0b' : '#f43f5e'
+                    })}
+                    className={cn(
+                      "group flex items-center gap-2 px-4 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all whitespace-nowrap shrink-0",
+                      seg.color === 'emerald' ? "bg-emerald-600 text-white hover:bg-emerald-700 shadow-md shadow-emerald-600/10" :
+                      seg.color === 'amber' ? "bg-amber-500 text-white hover:bg-amber-600 shadow-md shadow-amber-500/10" :
+                      "bg-rose-600 text-white hover:bg-rose-700 shadow-md shadow-rose-600/10"
+                    )}
+                  >
+                    Voir
+                    <ChevronRight className="w-3 h-3 transition-transform group-hover:translate-x-1" />
+                  </button>
                 </motion.div>
               ))}
             </div>
