@@ -136,7 +136,7 @@ function MapUpdater({ center, zoom, department, formations }: { center: [number,
   return null;
 }
 
-function MarkerWithAutoPopup({ position, icon, children, timestamp }: { position: [number, number], icon: any, children: React.ReactNode, timestamp: number | null }) {
+function MarkerWithAutoPopup({ position, icon, children, timestamp }: any) {
   const markerRef = useRef<L.Marker>(null);
   
   useEffect(() => {

@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'motion/react';
 import jsPDF from 'jspdf';
-import { toPng } from 'html-to-image';
+import { toJpeg } from 'html-to-image';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -183,9 +183,11 @@ export default function StatsPanel({
       // Small delay to ensure React finishes re-rendering in "export" mode
       await new Promise(resolve => setTimeout(resolve, 300));
       
-      const dataUrl = await toPng(element, {
-        quality: 0.95,
-        backgroundColor: '#f8fafc', // match slate-50 background
+      // Use toJpeg instead of toPng for better compression/file size
+      // We also set pixelRatio to 2 for good quality but not excessive
+      const dataUrl = await toJpeg(element, {
+        quality: 0.8,
+        backgroundColor: '#f8fafc',
         width: element.offsetWidth,
         height: element.offsetHeight,
         cacheBust: true,
@@ -198,13 +200,19 @@ export default function StatsPanel({
       if (filterBar) (filterBar as HTMLElement).style.display = 'flex';
       noPrintBtns.forEach(btn => (btn as HTMLElement).style.display = 'flex');
       
+      // Add margins (padding) to the PDF
+      const margin = 40; // Horizontal and vertical margins
+      const pdfWidth = element.offsetWidth + (margin * 2);
+      const pdfHeight = element.offsetHeight + (margin * 2);
+
       const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'px',
-        format: [element.offsetWidth, element.offsetHeight]
+        format: [pdfWidth, pdfHeight]
       });
       
-      pdf.addImage(dataUrl, 'PNG', 0, 0, element.offsetWidth, element.offsetHeight);
+      // Use 'JPEG' and 'FAST' compression
+      pdf.addImage(dataUrl, 'JPEG', margin, margin, element.offsetWidth, element.offsetHeight, undefined, 'FAST');
       pdf.save(`Rapport_Orientation_${pageType === 'general' ? 'General' : 'Pro'}_${new Date().toISOString().split('T')[0]}.pdf`);
       
     } catch (err) {
@@ -225,6 +233,7 @@ export default function StatsPanel({
     return {
       count: validData.length,
       totalPlaces,
+      avgPlaces: validData.length > 0 ? Math.round(totalPlaces / validData.length) : 0,
       selectivePct: validData.length > 0 ? Math.round((selectiveCount / validData.length) * 100) : 0,
       nonSelectivePct: validData.length > 0 ? Math.round((nonSelectiveCount / validData.length) * 100) : 0,
     };
@@ -804,7 +813,7 @@ export default function StatsPanel({
             <span className="text-xs font-black text-slate-400 uppercase tracking-[0.15em]">Formations</span>
           </div>
           <div className="text-5xl font-black text-slate-900 tracking-tighter">{overview.count}</div>
-          <p className="text-sm text-slate-400 mt-2 font-bold">Établissements analysés</p>
+          <p className="text-sm text-slate-400 mt-2 font-bold">Formations analysées</p>
         </motion.div>
 
         <motion.div 
@@ -820,10 +829,10 @@ export default function StatsPanel({
             <div className="p-3 bg-emerald-50 rounded-2xl text-emerald-600">
               <Users className="w-6 h-6" />
             </div>
-            <span className="text-xs font-black text-slate-400 uppercase tracking-[0.15em]">Places Totales</span>
+            <span className="text-xs font-black text-slate-400 uppercase tracking-[0.15em]">Moyenne des places</span>
           </div>
-          <div className="text-5xl font-black text-slate-900 tracking-tighter">{overview.totalPlaces.toLocaleString()}</div>
-          <p className="text-sm text-slate-400 mt-2 font-bold">Capacité d'accueil cumulée</p>
+          <div className="text-5xl font-black text-slate-900 tracking-tighter">{overview.avgPlaces.toLocaleString()}</div>
+          <p className="text-sm text-slate-400 mt-2 font-bold">Par formation (moyenne)</p>
         </motion.div>
 
         <motion.div 

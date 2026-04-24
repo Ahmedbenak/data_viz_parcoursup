@@ -177,7 +177,7 @@ function MapUpdater({ center, zoom, department, formations }: { center: [number,
   return null;
 }
 
-function MarkerWithAutoPopup({ position, icon, children, timestamp }: { position: [number, number], icon: any, children: React.ReactNode, timestamp: number | null }) {
+function MarkerWithAutoPopup({ position, icon, children, timestamp }: any) {
   const markerRef = useRef<L.Marker>(null);
   
   useEffect(() => {
@@ -216,6 +216,7 @@ export default function App() {
   
   // Phase tracking for sidebar guide
   const [activePhase, setActivePhase] = useState<1 | 2 | 3>(1);
+  const [unlockedPhases, setUnlockedPhases] = useState<Set<number>>(new Set([1]));
 
   // Scroll spy for phase tracking using IntersectionObserver
   useEffect(() => {
@@ -223,16 +224,23 @@ export default function App() {
 
     const options = {
       root: null,
-      rootMargin: '-10% 0px -70% 0px', // Trigger when section is in top part of viewport
-      threshold: 0
+      rootMargin: '-15% 0px -45% 0px', // More balanced margin for smoother transitions
+      threshold: 0.1 // Require a bit more visibility to trigger
     };
 
     const observer = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
         if (entry.isIntersecting) {
-          if (entry.target.id === 'section-phase-1') setActivePhase(1);
-          if (entry.target.id === 'section-phase-2') setActivePhase(2);
-          if (entry.target.id === 'section-phase-3') setActivePhase(3);
+          const phase = entry.target.id === 'section-phase-1' ? 1 : 
+                        entry.target.id === 'section-phase-2' ? 2 : 3;
+          
+          setActivePhase(phase as 1 | 2 | 3);
+          setUnlockedPhases(prev => {
+            if (prev.has(phase)) return prev;
+            const next = new Set(prev);
+            next.add(phase);
+            return next;
+          });
         }
       });
     }, options);
@@ -293,6 +301,7 @@ export default function App() {
     setOnboardingComplete(false);
     setOnboardingData(null);
     setSearchQuery('');
+    setUnlockedPhases(new Set([1]));
     setGeoFilter({
       city: '',
       department: '',
@@ -1260,8 +1269,8 @@ export default function App() {
             <div 
               id="section-phase-2"
               className={cn(
-                "scroll-mt-32 transition-all duration-1000 relative",
-                activePhase < 2 && "grayscale opacity-40 blur-[2px] pointer-events-none"
+                "scroll-mt-32 transition-all duration-500 relative",
+                !unlockedPhases.has(2) && "grayscale opacity-40 blur-[2px] pointer-events-none"
               )}
             >
               {onboardingData && (
@@ -1287,8 +1296,8 @@ export default function App() {
             <div 
               id="section-phase-3"
               className={cn(
-                "scroll-mt-32 transition-all duration-1000 relative",
-                activePhase < 3 && "grayscale opacity-40 blur-[2px] pointer-events-none"
+                "scroll-mt-32 transition-all duration-500 relative",
+                !unlockedPhases.has(3) && "grayscale opacity-40 blur-[2px] pointer-events-none"
               )}
             >
               <div className="bg-white rounded-3xl border border-slate-200 shadow-sm">
