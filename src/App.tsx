@@ -216,7 +216,6 @@ export default function App() {
   
   // Phase tracking for sidebar guide
   const [activePhase, setActivePhase] = useState<1 | 2 | 3>(1);
-  const [unlockedPhases, setUnlockedPhases] = useState<Set<number>>(new Set([1]));
 
   // Scroll spy for phase tracking using IntersectionObserver
   useEffect(() => {
@@ -235,12 +234,6 @@ export default function App() {
                         entry.target.id === 'section-phase-2' ? 2 : 3;
           
           setActivePhase(phase as 1 | 2 | 3);
-          setUnlockedPhases(prev => {
-            if (prev.has(phase)) return prev;
-            const next = new Set(prev);
-            next.add(phase);
-            return next;
-          });
         }
       });
     }, options);
@@ -301,7 +294,6 @@ export default function App() {
     setOnboardingComplete(false);
     setOnboardingData(null);
     setSearchQuery('');
-    setUnlockedPhases(new Set([1]));
     setGeoFilter({
       city: '',
       department: '',
@@ -1268,10 +1260,7 @@ export default function App() {
             {/* Phase 2: Comparisons */}
             <div 
               id="section-phase-2"
-              className={cn(
-                "scroll-mt-32 transition-all duration-500 relative",
-                !unlockedPhases.has(2) && "grayscale opacity-40 blur-[2px] pointer-events-none"
-              )}
+              className="scroll-mt-32 transition-all duration-500 relative"
             >
               {onboardingData && (
                 <StatsPanel 
@@ -1295,10 +1284,7 @@ export default function App() {
             {/* Phase 3: Cartographie */}
             <div 
               id="section-phase-3"
-              className={cn(
-                "scroll-mt-32 transition-all duration-500 relative",
-                !unlockedPhases.has(3) && "grayscale opacity-40 blur-[2px] pointer-events-none"
-              )}
+              className="scroll-mt-32 transition-all duration-500 relative"
             >
               <div className="bg-white rounded-3xl border border-slate-200 shadow-sm">
                 <div className="p-6 border-b border-slate-100">

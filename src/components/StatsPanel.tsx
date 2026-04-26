@@ -770,7 +770,7 @@ export default function StatsPanel({
           </button>
         </div>
 
-      <div className={cn("space-y-16 transition-all duration-500 relative", isEmpty && "grayscale opacity-40 pointer-events-none select-none blur-[1px]")}>
+      <div className={cn("space-y-16 transition-all duration-500 relative", isEmpty && "opacity-50")}>
         {isEmpty && (
           <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-auto">
             <motion.div 
