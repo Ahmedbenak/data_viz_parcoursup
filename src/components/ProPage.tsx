@@ -52,6 +52,13 @@ import { getSupabase } from '../lib/supabase';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
+import {
+  fetchCurrentStats,
+  fetchEmploymentEvolution,
+  fetchTopFormations,
+  fetchFormationsList
+} from '../lib/proStatsService';
+
 import StatsPanel from './StatsPanel';
 
 import { OnboardingData } from './OnboardingQuestionnaire';
@@ -168,9 +175,6 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
   const [error, setError] = useState<string | null>(null);
   
   // Data states
-  const [rawFineData, setRawFineData] = useState<any[]>([]);
-  const [rawEvolData, setRawEvolData] = useState<any[]>([]);
-  const [proData, setProData] = useState<any[]>([]);
   const [trajectoryData, setTrajectoryData] = useState<any[]>([]);
   const [outcomeData, setOutcomeData] = useState<any[]>([]);
   const [topFormations, setTopFormations] = useState<any[]>([]);
@@ -204,9 +208,75 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
     formationTypes: onboardingData?.targetFormationTypes || [] as string[]
   });
 
+  // Questionnaire states
+  const [showProOnboarding, setShowProOnboarding] = useState(true);
+  const [proUserNote, setProUserNote] = useState<string>('');
+  const [proOnboardingData, setProOnboardingData] = useState<{
+    bacPro: string;
+    targetFormation: string;
+    averageBac: string;
+    department: string;
+  }>({
+    bacPro: '',
+    targetFormation: '',
+    averageBac: '',
+    department: ''
+  });
+
+  const [qBacProSearch, setQBacProSearch] = useState('');
+  const [qDeptSearch, setQDeptSearch] = useState('');
+  const [showQBacProSuggestions, setShowQBacProSuggestions] = useState(false);
+  const [showQDeptSuggestions, setShowQDeptSuggestions] = useState(false);
+
+  // Load saved onboarding from localStorage if exists
+  useEffect(() => {
+    const saved = localStorage.getItem('parcoursup_pro_onboarding');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setProOnboardingData(parsed);
+        setQBacProSearch(parsed.bacPro);
+        setQDeptSearch(parsed.department);
+        
+        // Pre-select and set state directly
+        setSelectedBacPro(parsed.bacPro);
+        setProUserNote(parsed.averageBac);
+        setGeoFilter(prev => ({
+          ...prev,
+          department: parsed.department,
+          formationTypes: parsed.targetFormation ? [parsed.targetFormation] : prev.formationTypes
+        }));
+        setShowProOnboarding(false);
+      } catch (e) {
+        console.error("Error parsing saved pro onboarding:", e);
+      }
+    }
+  }, []);
+
+  const filteredQBacPros = useMemo(() => {
+    if (!qBacProSearch) return allBacPros.slice(0, 10);
+    return allBacPros.filter(bp => bp.toLowerCase().includes(qBacProSearch.toLowerCase())).slice(0, 10);
+  }, [allBacPros, qBacProSearch]);
+
+  const filteredQDepts = useMemo(() => {
+    if (!qDeptSearch) return allDepartments.slice(0, 10);
+    return allDepartments.filter(d => d.toLowerCase().includes(qDeptSearch.toLowerCase())).slice(0, 10);
+  }, [allDepartments, qDeptSearch]);
+
+  const isQFormValid = useMemo(() => {
+    const avg = parseFloat(proOnboardingData.averageBac);
+    const isAvgOk = !isNaN(avg) && avg >= 8 && avg <= 20;
+    return (
+      proOnboardingData.bacPro !== '' &&
+      proOnboardingData.targetFormation !== '' &&
+      proOnboardingData.department !== '' &&
+      isAvgOk
+    );
+  }, [proOnboardingData]);
+
   // Dynamic Color Mapping based on all loaded formation types
   const typeColorMap = useMemo(() => {
-    const map: Record<string, string> = {};
+    const map: Record<string, string> = { };
     allFormationTypes.forEach((type, index) => {
       const hue = (index * 360) / Math.max(1, allFormationTypes.length);
       map[type] = `hsl(${hue}, 75%, 45%)`;
@@ -218,181 +288,127 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
     return typeColorMap[type] || '#64748b';
   }, [typeColorMap]);
 
+  // Secondary Loading States
+  const [statsLoading, setStatsLoading] = useState(false);
+
+  // 1. Initial Metadata Load: dropdown options and map helper lists
   useEffect(() => {
-    const fetchData = async () => {
+    const loadMetadata = async () => {
       try {
         setLoading(true);
         const supabase = getSupabase();
-        const currentYear = 'cumul 2023-2024';
 
-        // 1. Parallel fetching using RPCs and optimized queries
         const [
-          { data: proData, error: proError },
-          { data: cityData, error: cityError },
-          { data: deptData, error: deptError },
-          { data: typeData, error: typeError },
-          { data: bacProListData, error: bacProListError }
+          cityResult,
+          deptResult,
+          typeResult,
+          bacProListData
         ] = await Promise.all([
-          supabase
-            .from('parcoursup_pro')
-            .select('taux_emploi_6mois, devenir_part_poursuite_etudes')
-            .eq('annee', currentYear)
-            .eq('dont_apprentis_eple', 'ensemble'),
           supabase.rpc('get_unique_cities'),
           supabase.rpc('get_unique_departments'),
           supabase.rpc('get_unique_formation_types_pro'),
-          supabase.rpc('get_unique_bac_pros')
+          fetchFormationsList()
         ]);
 
-        if (proError) throw proError;
-        if (cityError) throw cityError;
-        if (deptError) throw deptError;
-        if (typeError) throw typeError;
-        if (bacProListError) throw bacProListError;
+        if (cityResult.error) throw cityResult.error;
+        if (deptResult.error) throw deptResult.error;
+        if (typeResult.error) throw typeResult.error;
 
-        if (proData) setProData(proData);
-        if (cityData) setAllCities(cityData.map((r: any) => r.city));
-        if (deptData) setAllDepartments(deptData.map((r: any) => r.dept));
-        if (typeData) setAllFormationTypes(typeData.map((r: any) => r.filiere));
-        if (bacProListData) setAllBacPros(bacProListData.map((r: any) => r.libelle));
-
-        // 2. Fetch ALL data for Bac Pro (all years) to support both current stats and evolution chart
-        let allFineData: any[] = [];
-        let fineFrom = 0;
-        const FINE_PAGE_SIZE = 1000;
-        let hasMoreFine = true;
-
-        while (hasMoreFine) {
-          const { data, error } = await supabase
-            .from('parcoursup_fine_clean')
-            .select('*')
-            .eq('type_diplome', 'BAC PRO')
-            .range(fineFrom, fineFrom + FINE_PAGE_SIZE - 1);
-          
-          if (error) throw error;
-          if (data && data.length > 0) {
-            allFineData = [...allFineData, ...data];
-            if (data.length < FINE_PAGE_SIZE) {
-              hasMoreFine = false;
-            } else {
-              fineFrom += FINE_PAGE_SIZE;
-            }
-          } else {
-            hasMoreFine = false;
-          }
-        }
-
-        if (allFineData.length > 0) {
-          // Current year data for Trajectory and Outcomes
-          setRawFineData(allFineData.filter(d => d.annee === currentYear));
-          
-          // All years for the evolution chart
-          setRawEvolData(allFineData.map(d => ({
-            annee: d.annee,
-            taux_emploi_6mois: d.taux_emploi_6mois,
-            libelle_formation: d.libelle_formation
-          })));
-        }
+        if (cityResult.data) setAllCities(cityResult.data.map((r: any) => r.city));
+        if (deptResult.data) setAllDepartments(deptResult.data.map((r: any) => r.dept));
+        if (typeResult.data) setAllFormationTypes(typeResult.data.map((r: any) => r.filiere));
+        if (bacProListData) setAllBacPros(bacProListData);
 
       } catch (err: any) {
-        console.error('Error fetching Pro data:', err);
-        setError("Impossible de charger les données statistiques.");
+        console.error('Error fetching Pro page metadata:', err);
+        setError("Impossible de charger les métadonnées de la page.");
       } finally {
         setLoading(false);
       }
     };
 
-    fetchData();
+    loadMetadata();
   }, []);
 
-  // Process data when raw data or selectedBacPro changes
+  // 2. Reactive Statistics Load: when selected specialty or dropdown references change
   useEffect(() => {
-    if (rawFineData.length === 0 && rawEvolData.length === 0) return;
+    const loadStats = async () => {
+      try {
+        setStatsLoading(true);
+        
+        // A. Fetch current stats for selection or fallback to global
+        const statsRow = await fetchCurrentStats(selectedBacPro || null);
+        
+        if (statsRow) {
+          // Process Trajectory Points
+          const trajectory = [
+            { name: '6 mois', value: statsRow.avg_taux_emploi_6mois },
+            { name: '12 mois', value: statsRow.avg_taux_emploi_12mois },
+            { name: '18 mois', value: statsRow.avg_taux_emploi_18mois },
+            { name: '24 mois', value: statsRow.avg_taux_emploi_24mois },
+          ].filter(d => d.value !== null);
+          setTrajectoryData(trajectory);
 
-    let filteredFine = rawFineData;
-    let filteredEvol = rawEvolData;
+          // Process Outcomes Points
+          const outcomes = [
+            { name: 'Emploi', value: statsRow.avg_devenir_part_emploi_6mois },
+            { name: 'Études', value: statsRow.avg_devenir_part_poursuite_etudes },
+            { name: 'Autre', value: statsRow.avg_devenir_part_autre_situation_6mois },
+          ].filter(d => d.value !== null);
+          setOutcomeData(outcomes);
 
-    if (selectedBacPro) {
-      filteredFine = rawFineData.filter(d => d.libelle_formation === selectedBacPro);
-      filteredEvol = rawEvolData.filter(d => d.libelle_formation === selectedBacPro);
-    }
-
-    // Calculate Trajectory
-    const trajectory = [
-      { name: '6 mois', value: calculateAvg(filteredFine, 'taux_emploi_6mois') },
-      { name: '12 mois', value: calculateAvg(filteredFine, 'taux_emploi_12mois') },
-      { name: '18 mois', value: calculateAvg(filteredFine, 'taux_emploi_18mois') },
-      { name: '24 mois', value: calculateAvg(filteredFine, 'taux_emploi_24mois') },
-    ].filter(d => d.value !== null);
-    setTrajectoryData(trajectory);
-
-    // Calculate Outcomes
-    const outcomes = [
-      { name: 'Emploi', value: calculateAvg(filteredFine, 'devenir_part_emploi_6mois') },
-      { name: 'Études', value: calculateAvg(filteredFine, 'devenir_part_poursuite_etudes') },
-      { name: 'Autre', value: calculateAvg(filteredFine, 'devenir_part_autre_situation_6mois') },
-    ].filter(d => d.value !== null);
-    setOutcomeData(outcomes);
-
-    // Top Formations (Always show top 10 from all Bac Pros for context, unless selectedBacPro is set)
-    // Actually, if selectedBacPro is set, maybe we show top 10 similar ones? 
-    // For now, let's keep Top 10 as global context if no selection, or just the selection if selected.
-    const formationGroups: { [key: string]: { sum: number, count: number } } = {};
-    const dataForTop = selectedBacPro ? filteredFine : rawFineData;
-    dataForTop.forEach(item => {
-      const val = parseNumeric(item.taux_emploi_6mois);
-      if (val !== null && item.libelle_formation) {
-        const name = item.libelle_formation.charAt(0).toUpperCase() + item.libelle_formation.slice(1);
-        if (!formationGroups[name]) formationGroups[name] = { sum: 0, count: 0 };
-        formationGroups[name].sum += val;
-        formationGroups[name].count += 1;
-      }
-    });
-
-    const top = Object.entries(formationGroups)
-      .map(([name, data]) => ({
-        name,
-        value: Math.round((data.sum / data.count) * 10) / 10
-      }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 10);
-    setTopFormations(top);
-
-    // Global Stats
-    setStats({
-      avgEmployment: (proData && proData.length > 0 && !selectedBacPro) 
-        ? (calculateAvg(proData, 'taux_emploi_6mois') || calculateAvg(filteredFine, 'taux_emploi_6mois') || 0)
-        : (calculateAvg(filteredFine, 'taux_emploi_6mois') || 0),
-      avgStudies: (proData && proData.length > 0 && !selectedBacPro)
-        ? (calculateAvg(proData, 'devenir_part_poursuite_etudes') || calculateAvg(filteredFine, 'devenir_part_poursuite_etudes') || 0)
-        : (calculateAvg(filteredFine, 'devenir_part_poursuite_etudes') || 0),
-      totalFormations: selectedBacPro ? 1 : new Set(rawFineData.map(d => d.libelle_formation)).size
-    });
-
-    // Evolution Data
-    if (filteredEvol.length > 0) {
-      const yearOrder = [
-        'cumul 2018-2019', 'cumul 2019-2020', 'cumul 2020-2021',
-        'cumul 2021-2022', 'cumul 2022-2023', 'cumul 2023-2024'
-      ];
-      const yearGroups: { [key: string]: { sum: number, count: number } } = {};
-      filteredEvol.forEach(item => {
-        const val = parseNumeric(item.taux_emploi_6mois);
-        if (val !== null) {
-          if (!yearGroups[item.annee]) yearGroups[item.annee] = { sum: 0, count: 0 };
-          yearGroups[item.annee].sum += val;
-          yearGroups[item.annee].count += 1;
+          // Header summary stats
+          setStats({
+            avgEmployment: statsRow.avg_taux_emploi_6mois || 0,
+            avgStudies: statsRow.avg_devenir_part_poursuite_etudes || 0,
+            totalFormations: selectedBacPro ? 1 : (statsRow.total_formations_uniques || allBacPros.length)
+          });
         }
-      });
-      const evolution = yearOrder
-        .filter(year => yearGroups[year])
-        .map(year => ({
-          name: year.replace('cumul ', ''),
-          value: Math.round((yearGroups[year].sum / yearGroups[year].count) * 10) / 10
+
+        // B. Fetch evolution over time
+        const evolutionPoints = await fetchEmploymentEvolution(selectedBacPro || null);
+        const evolution = evolutionPoints.map(p => ({
+          name: p.annee.replace('cumul ', ''),
+          value: p.taux_emploi_6mois
+        })).filter(p => p.value !== null);
+        setEvolutionData(evolution);
+
+        // C. Fetch top formations list
+        const topList = await fetchTopFormations(10);
+        let top = topList.map(item => ({
+          name: item.libelle_formation.charAt(0).toUpperCase() + item.libelle_formation.slice(1),
+          value: item.avg_taux_emploi_6mois,
+          isHighlighted: false
         }));
-      setEvolutionData(evolution);
-    }
-  }, [rawFineData, rawEvolData, proData, selectedBacPro]);
+
+        if (selectedBacPro) {
+          const formattedSelectedName = selectedBacPro.charAt(0).toUpperCase() + selectedBacPro.slice(1);
+          const foundIndex = top.findIndex(item => item.name.toLowerCase() === selectedBacPro.toLowerCase() || item.name.toLowerCase().includes(selectedBacPro.toLowerCase()));
+          
+          if (foundIndex !== -1) {
+            top[foundIndex].isHighlighted = true;
+            top[foundIndex].name = `🌟 ${top[foundIndex].name} (Mon Bac)`;
+          } else if (statsRow) {
+            top.push({
+              name: `🌟 ${formattedSelectedName} (Mon Bac)`,
+              value: statsRow.avg_taux_emploi_6mois || 0,
+              isHighlighted: true
+            });
+            // Re-sort descending by value to show exactly where it fits in rank!
+            top.sort((a, b) => b.value - a.value);
+          }
+        }
+        setTopFormations(top);
+
+      } catch (err) {
+        console.error('Error fetching Pro stats:', err);
+      } finally {
+        setStatsLoading(false);
+      }
+    };
+
+    loadStats();
+  }, [selectedBacPro, allBacPros.length]);
 
   // Reactive Map Data Fetching (Identical to General section)
   useEffect(() => {
@@ -609,6 +625,232 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
     );
   }
 
+  if (showProOnboarding) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 sm:p-12 relative">
+        {/* Floating Back Button in Onboarding */}
+        <div className="absolute top-8 left-8 z-[100]">
+          <button 
+            onClick={onBack}
+            className="flex items-center gap-2 px-5 py-2.5 bg-slate-900/90 backdrop-blur-sm text-white rounded-full font-bold shadow-xl hover:bg-slate-800 transition-all hover:scale-105 active:scale-95 group border border-white/20 text-sm"
+          >
+            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+            <span>Retour à l'accueil</span>
+          </button>
+        </div>
+
+        <div className="max-w-4xl w-full mt-12 sm:mt-0">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
+            className="bg-white p-8 sm:p-16 rounded-[4.5rem] shadow-soft border border-slate-100 relative overflow-hidden"
+          >
+            {/* Decorative background elements */}
+            <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full -mr-32 -mt-32 blur-3xl" />
+            <div className="absolute bottom-0 left-0 w-64 h-64 bg-primary/5 rounded-full -ml-32 -mb-32 blur-3xl" />
+
+            <div className="mb-12 text-center relative z-10">
+              <motion.div 
+                whileHover={{ rotate: 10, scale: 1.1 }}
+                className="w-20 h-20 bg-primary-light rounded-[2rem] flex items-center justify-center mb-6 mx-auto shadow-lg shadow-primary/10"
+              >
+                <GraduationCap className="w-10 h-10 text-primary" />
+              </motion.div>
+              <h2 className="text-4xl font-black text-slate-900 mb-3 tracking-tighter">Votre profil Bac Pro</h2>
+              <p className="text-slate-500 font-medium text-lg">Parlez-nous de votre parcours pour des recommandations adaptées.</p>
+            </div>
+
+            <div className="space-y-8 relative z-10">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                
+                {/* Section 1: Formation Actuelle */}
+                <div className="space-y-3 relative">
+                  <label className="flex items-center gap-3 text-xs font-black text-slate-400 uppercase tracking-[0.2em]">
+                    <span className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-[11px] shadow-lg shadow-primary/25 font-black">1</span>
+                    Ma formation actuelle (Bac Pro)
+                  </label>
+                  <div className="relative">
+                    <input 
+                      type="text"
+                      placeholder="Ex: Commerce, Électricité..."
+                      value={qBacProSearch}
+                      onChange={(e) => {
+                        setQBacProSearch(e.target.value);
+                        setProOnboardingData(p => ({ ...p, bacPro: e.target.value }));
+                        setShowQBacProSuggestions(true);
+                      }}
+                      onFocus={() => setShowQBacProSuggestions(true)}
+                      className="w-full text-base font-bold text-slate-900 bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 outline-none focus:ring-4 focus:ring-primary/10 focus:bg-white transition-all placeholder:text-slate-400"
+                    />
+                    {showQBacProSuggestions && (
+                      <>
+                        <div className="fixed inset-0 z-10" onClick={() => setShowQBacProSuggestions(false)} />
+                        <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-100 rounded-2xl shadow-2xl z-20 max-h-60 overflow-y-auto p-2 custom-scrollbar">
+                          {filteredQBacPros.length > 0 ? (
+                            filteredQBacPros.map((bp, idx) => (
+                              <button
+                                key={idx}
+                                onClick={() => {
+                                  setQBacProSearch(bp);
+                                  setProOnboardingData(p => ({ ...p, bacPro: bp }));
+                                  setShowQBacProSuggestions(false);
+                                }}
+                                className="w-full text-left px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 hover:text-primary rounded-xl transition-all"
+                              >
+                                {bp}
+                              </button>
+                            ))
+                          ) : (
+                            <div className="px-4 py-4 text-sm text-slate-400 italic text-center">Aucune spécialité trouvée</div>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Section 2: Formation Visée */}
+                <div className="space-y-3">
+                  <label className="flex items-center gap-3 text-xs font-black text-slate-400 uppercase tracking-[0.2em]">
+                    <span className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-[11px] shadow-lg shadow-primary/25 font-black">2</span>
+                    Filière visée (Poursuite d'études)
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={proOnboardingData.targetFormation}
+                      onChange={(e) => setProOnboardingData(p => ({ ...p, targetFormation: e.target.value }))}
+                      className="w-full text-base font-bold text-slate-900 bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 outline-none focus:ring-4 focus:ring-primary/10 focus:bg-white transition-all appearance-none cursor-pointer"
+                    >
+                      <option value="">Sélectionner une formation...</option>
+                      {allFormationTypes.map((type, idx) => (
+                        <option key={idx} value={type}>{type}</option>
+                      ))}
+                    </select>
+                    <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                      <ChevronDown className="w-5 h-5" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section 3: Moyenne Attendue / Obtenue */}
+                <div className="space-y-3">
+                  <label className="flex items-center gap-3 text-xs font-black text-slate-400 uppercase tracking-[0.2em]">
+                    <span className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-[11px] shadow-lg shadow-primary/25 font-black">3</span>
+                    Moyenne attendue ou obtenue au Bac
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ex: 14.5 (De 8 à 20)"
+                    value={proOnboardingData.averageBac}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(',', '.');
+                      if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                        setProOnboardingData(p => ({ ...p, averageBac: value }));
+                      }
+                    }}
+                    className="w-full text-base font-bold text-slate-900 bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 outline-none focus:ring-4 focus:ring-primary/10 focus:bg-white transition-all placeholder:text-slate-400"
+                  />
+                </div>
+
+                {/* Section 4: Département */}
+                <div className="space-y-3 relative">
+                  <label className="flex items-center gap-3 text-xs font-black text-slate-400 uppercase tracking-[0.2em]">
+                    <span className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-[11px] shadow-lg shadow-primary/25 font-black">4</span>
+                    Département d'intérêt
+                  </label>
+                  <div className="relative">
+                    <input 
+                      type="text"
+                      placeholder="Ex: 75 ou Paris ou Haute-Savoie..."
+                      value={qDeptSearch}
+                      onChange={(e) => {
+                        setQDeptSearch(e.target.value);
+                        setProOnboardingData(p => ({ ...p, department: e.target.value }));
+                        setShowQDeptSuggestions(true);
+                      }}
+                      onFocus={() => setShowQDeptSuggestions(true)}
+                      className="w-full text-base font-bold text-slate-900 bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 outline-none focus:ring-4 focus:ring-primary/10 focus:bg-white transition-all placeholder:text-slate-400"
+                    />
+                    {showQDeptSuggestions && (
+                      <>
+                        <div className="fixed inset-0 z-10" onClick={() => setShowQDeptSuggestions(false)} />
+                        <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-100 rounded-2xl shadow-2xl z-20 max-h-60 overflow-y-auto p-2 custom-scrollbar">
+                          {filteredQDepts.length > 0 ? (
+                            filteredQDepts.map((dept, idx) => (
+                              <button
+                                key={idx}
+                                onClick={() => {
+                                  setQDeptSearch(dept);
+                                  setProOnboardingData(p => ({ ...p, department: dept }));
+                                  setShowQDeptSuggestions(false);
+                                }}
+                                className="w-full text-left px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 hover:text-primary rounded-xl transition-all"
+                              >
+                                {dept}
+                              </button>
+                            ))
+                          ) : (
+                            <div className="px-4 py-4 text-sm text-slate-400 italic text-center">Aucun département trouvé</div>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-100 mt-8">
+                <button
+                  onClick={onBack}
+                  className="w-full sm:w-auto px-8 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold text-sm hover:bg-slate-200 transition-colors"
+                >
+                  Retour
+                </button>
+                <div className="flex items-center justify-end gap-4 w-full sm:w-auto">
+                  <button
+                    onClick={() => {
+                      setShowProOnboarding(false);
+                    }}
+                    className="px-6 py-4 text-slate-400 hover:text-slate-600 transition-colors font-bold text-sm"
+                  >
+                    Passer
+                  </button>
+                  <button
+                    disabled={!isQFormValid}
+                    onClick={() => {
+                      localStorage.setItem('parcoursup_pro_onboarding', JSON.stringify(proOnboardingData));
+                      setSelectedBacPro(proOnboardingData.bacPro);
+                      setProUserNote(proOnboardingData.averageBac);
+                      setGeoFilter(prev => ({
+                        ...prev,
+                        department: proOnboardingData.department,
+                        formationTypes: proOnboardingData.targetFormation ? [proOnboardingData.targetFormation] : prev.formationTypes
+                      }));
+                      setShowProOnboarding(false);
+                    }}
+                    className={cn(
+                      "w-full sm:w-auto px-10 py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 shadow-lg transition-all",
+                      isQFormValid 
+                        ? "bg-primary text-white hover:bg-primary-dark hover:-translate-y-0.5 active:translate-y-0" 
+                        : "bg-slate-100 text-slate-400 cursor-not-allowed shadow-none"
+                    )}
+                  >
+                    <span>Valider & Analyser</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          </motion.div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 pb-20">
       <Header onboardingData={onboardingData} setOnboardingComplete={setOnboardingComplete} onHome={onBack} />
@@ -631,9 +873,28 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
           <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-soft relative z-10">
             <div className="flex flex-col md:flex-row md:items-center gap-6">
               <div className="flex-1 space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
-                  <Search className="w-3 h-3" /> Ma formation actuelle (Bac Pro)
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                    <Search className="w-3 h-3" /> Ma formation actuelle (Bac Pro)
+                  </label>
+                  <button 
+                    onClick={() => {
+                      setQBacProSearch(selectedBacPro);
+                      setQDeptSearch(geoFilter.department);
+                      setProOnboardingData({
+                        bacPro: selectedBacPro,
+                        targetFormation: geoFilter.formationTypes[0] || '',
+                        averageBac: proUserNote || (onboardingData?.averageBac || ''),
+                        department: geoFilter.department
+                      });
+                      setShowProOnboarding(true);
+                    }}
+                    className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl font-bold text-xs hover:bg-slate-200 hover:scale-105 transition-all flex items-center gap-1.5 shrink-0"
+                  >
+                    <Target className="w-3.5 h-3.5 text-primary" />
+                    <span>Modifier mon profil</span>
+                  </button>
+                </div>
                 <div className="relative">
                   <input 
                     type="text"
@@ -732,16 +993,16 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
           <KPICard 
             title="Taux d'emploi à 6 mois"
-            value={stats.avgEmployment > 0 ? `${stats.avgEmployment}%` : "Donnée indisponible"}
+            value={stats.avgEmployment > 0 ? `${stats.avgEmployment.toFixed(2)}%` : "Donnée indisponible"}
             icon={<TrendingUp className="w-7 h-7" />}
             description={selectedBacPro ? `Moyenne pour le ${selectedBacPro}` : "Moyenne nationale Bac Pro"}
             color="emerald"
           />
           <KPICard 
             title="Poursuite d'études"
-            value={stats.avgStudies > 0 ? `${stats.avgStudies}%` : "Donnée indisponible"}
+            value={stats.avgStudies > 0 ? `${stats.avgStudies.toFixed(2)}%` : "Donnée indisponible"}
             icon={<GraduationCap className="w-7 h-7" />}
-            description={selectedBacPro ? `Part des diplômés de ${selectedBacPro} qui continuent.` : `${stats.avgStudies}% des diplômés choisissent de continuer leurs études.`}
+            description={selectedBacPro ? `Part des diplômés de ${selectedBacPro} qui continuent.` : `${stats.avgStudies.toFixed(2)}% des diplômés choisissent de continuer leurs études.`}
             color="blue"
           />
           <KPICard 
@@ -755,12 +1016,15 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
 
         <div className="grid grid-cols-1 gap-12 mb-12">
           {/* Top Formations */}
-          <ChartContainer title={selectedBacPro ? `Statistiques pour : ${selectedBacPro}` : "Top 10 des formations par taux d'emploi"} icon={<BarChart3 className="w-6 h-6" />}>
+          <ChartContainer 
+            title={selectedBacPro ? "Ma formation parmi les meilleures de France" : "Top 10 des formations par taux d'emploi"} 
+            icon={<BarChart3 className="w-6 h-6" />}
+          >
             <div className="mb-8 p-6 bg-slate-50 rounded-3xl border border-slate-100">
-              <p className="text-sm text-slate-600 leading-relaxed font-medium">
+              <p className="text-sm text-slate-600 leading-relaxed font-medium font-sans">
                 {selectedBacPro 
-                  ? `Voici les statistiques d'insertion pour le ${selectedBacPro}.`
-                  : `Ce graphique présente les 10 spécialités de Bac Pro qui offrent les meilleurs débouchés immédiats sur le marché du travail (taux d'emploi à 6 mois après l'obtention du diplôme).`
+                  ? `Votre spécialité (${selectedBacPro}) est mise en surbrillance bleue pour vous permettre de situer ses performances d'insertion à 6 mois par rapport aux formations les plus porteuses.`
+                  : "Ce graphique présente les 10 spécialités de Bac Pro qui offrent les meilleurs débouchés immédiats sur le marché du travail (taux d'emploi à 6 mois après l'obtention du diplôme)."
                 }
               </p>
             </div>
@@ -781,12 +1045,29 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
                     />
                     <Tooltip 
                       contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                      formatter={(value: number) => [`${value.toFixed(1)}%`, "Taux d'emploi"]}
+                      formatter={(value: number) => [`${value.toFixed(2)}%`, "Taux d'emploi"]}
                     />
                     <Bar dataKey="value" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={20}>
-                      {topFormations.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
+                      {topFormations.map((entry, index) => {
+                        const baseColor = COLORS[index % COLORS.length];
+                        if (entry.isHighlighted) {
+                          return (
+                            <Cell 
+                              key={`cell-${index}`} 
+                              fill={baseColor}
+                              stroke="#0f172a"
+                              strokeWidth={3}
+                            />
+                          );
+                        }
+                        return (
+                          <Cell 
+                            key={`cell-${index}`} 
+                            fill={baseColor} 
+                            opacity={selectedBacPro ? 0.65 : 1}
+                          />
+                        );
+                      })}
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
@@ -809,7 +1090,7 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
                     <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} unit="%" domain={['auto', 'auto']} />
                     <Tooltip 
                       contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                      formatter={(value: number) => [`${value.toFixed(1)}%`, "Taux d'emploi"]}
+                      formatter={(value: number) => [`${value.toFixed(2)}%`, "Taux d'emploi"]}
                     />
                     <Line 
                       type="monotone" 
@@ -847,7 +1128,7 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
                     </Pie>
                     <Tooltip 
                       contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                      formatter={(value: number) => [`${value.toFixed(1)}%`, "Part"]}
+                      formatter={(value: number) => [`${value.toFixed(2)}%`, "Part"]}
                     />
                     <Legend verticalAlign="bottom" height={36}/>
                   </PieChart>
@@ -858,6 +1139,22 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
             </div>
           </ChartContainer>
         </div>
+
+        {/* Stats Panel Section */}
+        <StatsPanel 
+          data={filteredMapData} 
+          userNote={proUserNote ? parseFloat(proUserNote) : (onboardingData ? parseFloat(onboardingData.averageBac) : null)}
+          selectedDepartment={geoFilter.department || undefined}
+          selectedCity={geoFilter.city || undefined}
+          selectedFormations={geoFilter.formationTypes}
+          allDataOfSameType={mapData}
+          allFormationTypes={allFormationTypes}
+          allCities={allCities}
+          allDepartments={allDepartments}
+          onFilterChange={(filters) => setGeoFilter(prev => ({ ...prev, ...filters }))}
+          onShowOnMap={handleShowOnMap}
+          pageType="pro"
+        />
 
         {/* Map Section */}
         <div id="section-geo-pro" className="mb-12">
@@ -983,7 +1280,7 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
                               <div className="bg-slate-50 p-2 rounded-lg">
                                 <span className="block text-[10px] text-slate-400 uppercase font-bold">Taux Accès</span>
                                 <span className="text-sm font-bold text-primary">
-                                  {f.taux_acces !== null ? `${f.taux_acces}%` : "Inconnu"}
+                                  {f.taux_acces !== null ? `${f.taux_acces.toFixed(2)}%` : "Inconnu"}
                                 </span>
                               </div>
                               <div className="bg-slate-50 p-2 rounded-lg">
@@ -997,10 +1294,10 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
                                 Note moyenne au bac pour les admis: {f.note_moyenne !== null ? `${f.note_moyenne.toFixed(2)}/20` : "N/A"}
                               </span>
                               <span className="text-[10px] text-emerald-600 font-bold block">
-                                Part de boursiers: {f.pct_admis_neo_boursiers !== undefined ? `${f.pct_admis_neo_boursiers}%` : "N/A"}
+                                Part de boursiers: {f.pct_admis_neo_boursiers !== undefined ? `${f.pct_admis_neo_boursiers.toFixed(2)}%` : "N/A"}
                               </span>
                               <span className="text-[10px] text-slate-400 font-medium italic leading-tight block">
-                                % Bac Pro admis: {f.pct_admis_neo_pro}%
+                                % Bac Pro admis: {f.pct_admis_neo_pro.toFixed(2)}%
                               </span>
                               {f.lien_parcoursup && (
                                 <a 
@@ -1029,26 +1326,8 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
                 )}
               </MapContainer>
             </div>
-
-
           </div>
         </div>
-
-        {/* Stats Panel Section */}
-        <StatsPanel 
-          data={filteredMapData} 
-          userNote={onboardingData ? parseFloat(onboardingData.averageBac) : null}
-          selectedDepartment={geoFilter.department || undefined}
-          selectedCity={geoFilter.city || undefined}
-          selectedFormations={geoFilter.formationTypes}
-          allDataOfSameType={mapData}
-          allFormationTypes={allFormationTypes}
-          allCities={allCities}
-          allDepartments={allDepartments}
-          onFilterChange={(filters) => setGeoFilter(prev => ({ ...prev, ...filters }))}
-          onShowOnMap={handleShowOnMap}
-          pageType="pro"
-        />
 
         <div className="grid grid-cols-1 gap-8">
           {/* External Links */}

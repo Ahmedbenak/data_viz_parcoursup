@@ -568,7 +568,7 @@ export default function StatsPanel({
                           <div className="flex items-center justify-between pt-4 border-t border-slate-200/50">
                             <div className="flex flex-col">
                               <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-tight">Note moyenne des intégrés</span>
-                              <span className="text-base font-black text-slate-900">{item.note_moyenne?.toFixed(1)} <span className="text-xs text-slate-300">/ 20</span></span>
+                              <span className="text-base font-black text-slate-900">{item.note_moyenne?.toFixed(2)} <span className="text-xs text-slate-300">/ 20</span></span>
                             </div>
                             <div className="flex flex-col text-right">
                               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Places</span>
@@ -1172,15 +1172,15 @@ export default function StatsPanel({
                 },
                 { 
                   label: "Taux d'accès moyen", 
-                  val: Math.round(departmentalProfile?.tauxAcces || 0), 
-                  nat: Math.round(nationalProfile?.tauxAcces || 0), 
+                  val: departmentalProfile?.tauxAcces || 0, 
+                  nat: nationalProfile?.tauxAcces || 0, 
                   isPct: true,
                   desc: "Pourcentage moyen de candidats ayant reçu une proposition d'admission."
                 },
                 { 
                   label: "% Bac Général", 
-                  val: Math.round(departmentalProfile?.neoGen || 0), 
-                  nat: Math.round(nationalProfile?.neoGen || 0), 
+                  val: departmentalProfile?.neoGen || 0, 
+                  nat: nationalProfile?.neoGen || 0, 
                   isPct: true,
                   desc: "Part des bacheliers généraux parmi l'ensemble des admis."
                 }
@@ -1201,7 +1201,7 @@ export default function StatsPanel({
                     <div className="flex flex-col">
                       <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">National</span>
                       <div className="text-2xl font-black text-slate-900 tracking-tighter">
-                        {item.isNote ? item.nat.toFixed(1) : item.nat}{item.isPct ? '%' : ''}
+                        {item.isNote ? item.nat.toFixed(2) : (item.isPct ? item.nat.toFixed(2) : item.nat)}{item.isPct ? '%' : ''}
                       </div>
                     </div>
 
@@ -1209,7 +1209,7 @@ export default function StatsPanel({
                       <div className="flex flex-col text-right">
                         <span className="text-[9px] font-black text-primary/60 uppercase tracking-widest mb-1">{selectedDepartment}</span>
                         <div className="text-4xl font-black text-primary tracking-tighter">
-                          {item.isNote ? item.val.toFixed(1) : item.val}{item.isPct ? '%' : ''}
+                          {item.isNote ? item.val.toFixed(2) : (item.isPct ? item.val.toFixed(2) : item.val)}{item.isPct ? '%' : ''}
                           {item.hasStar && <span className="text-xl ml-1">*</span>}
                         </div>
                       </div>
@@ -1277,7 +1277,7 @@ export default function StatsPanel({
             pageType === 'general' 
               ? { icon: GraduationCap, text: `${Math.round(profile?.neoGen || 0)}% des admis ont un bac général`, color: 'text-blue-400', bg: 'bg-blue-400/10' }
               : { icon: GraduationCap, text: `${Math.round(profile?.neoPro || 0)}% des admis ont un bac pro`, color: 'text-pink-400', bg: 'bg-pink-400/10' },
-            { icon: Target, text: `Note moyenne requise : ${(profile?.meanNote || 0).toFixed(1)}/20`, color: 'text-primary', bg: 'bg-primary/10' },
+            { icon: Target, text: `Note moyenne requise : ${(profile?.meanNote || 0).toFixed(2)}/20`, color: 'text-primary', bg: 'bg-primary/10' },
             { icon: UserCheck, text: `${Math.round(100 - (profile?.mentions.sans || 0))}% des admis ont une mention`, color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
             { icon: Users, text: `${Math.round(profile?.boursiers || 0)}% de boursiers parmi les admis`, color: 'text-purple-400', bg: 'bg-purple-400/10' }
           ].map((item, i) => (
