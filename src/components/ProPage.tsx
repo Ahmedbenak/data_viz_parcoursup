@@ -993,6 +993,7 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
           <KPICard 
             title="Taux d'emploi à 6 mois"
+            subtitle="Calculé parmi les diplômés qui recherchent un emploi après leurs études."
             value={stats.avgEmployment > 0 ? `${stats.avgEmployment.toFixed(2)}%` : "Donnée indisponible"}
             icon={<TrendingUp className="w-7 h-7" />}
             description={selectedBacPro ? `Moyenne pour le ${selectedBacPro}` : "Moyenne nationale Bac Pro"}
@@ -1000,13 +1001,21 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
           />
           <KPICard 
             title="Poursuite d'études"
+            subtitle={selectedBacPro 
+              ? `Calculé parmi l'ensemble des élèves de ce Bac Pro.` 
+              : "Calculé parmi l'ensemble des élèves de la formation."
+            }
             value={stats.avgStudies > 0 ? `${stats.avgStudies.toFixed(2)}%` : "Donnée indisponible"}
             icon={<GraduationCap className="w-7 h-7" />}
-            description={selectedBacPro ? `Part des diplômés de ${selectedBacPro} qui continuent.` : `${stats.avgStudies.toFixed(2)}% des diplômés choisissent de continuer leurs études.`}
+            description={selectedBacPro 
+              ? `Parmi l'ensemble des élèves de la formation ${selectedBacPro}, ${stats.avgStudies > 0 ? stats.avgStudies.toFixed(2) : "0"}% décident de poursuivre leurs études.` 
+              : `Parmi l'ensemble des diplômés, ${stats.avgStudies > 0 ? stats.avgStudies.toFixed(2) : "0"}% décident de poursuivre leurs études.`
+            }
             color="blue"
           />
           <KPICard 
             title="Formations analysées"
+            subtitle="Volume total de filières suivies dans cette étude."
             value={stats.totalFormations > 0 ? stats.totalFormations.toString() : "0"}
             icon={<Users className="w-7 h-7" />}
             description={selectedBacPro ? "Données spécifiques à cette spécialité." : "Nombre de spécialités de Bac Pro suivies dans cette analyse."}
@@ -1371,7 +1380,7 @@ function NoDataMessage({ message = "Informations indisponibles pour cette format
   );
 }
 
-function KPICard({ title, value, icon, description, color }: { title: string, value: string, icon: React.ReactNode, description: string, color: 'emerald' | 'blue' | 'amber' }) {
+function KPICard({ title, subtitle, value, icon, description, color }: { title: string, subtitle?: string, value: string, icon: React.ReactNode, description: string, color: 'emerald' | 'blue' | 'amber' }) {
   const colors = {
     emerald: "bg-emerald-50/50 border-emerald-100/50 text-emerald-600",
     blue: "bg-blue-50/50 border-blue-100/50 text-blue-600",
@@ -1381,16 +1390,32 @@ function KPICard({ title, value, icon, description, color }: { title: string, va
   return (
     <motion.div 
       whileHover={{ y: -5, shadow: "var(--shadow-hover)" }}
-      className={cn("p-8 rounded-[2.5rem] border bg-white shadow-soft transition-all", colors[color])}
+      className={cn("p-8 rounded-[2.5rem] border bg-white shadow-soft transition-all flex flex-col h-full justify-between", colors[color])}
     >
-      <div className="flex items-center justify-between mb-8">
-        <div className={cn("p-4 rounded-2xl shadow-sm bg-white", colors[color])}>
-          {icon}
+      <div>
+        <div className="flex items-center justify-between mb-8">
+          <div className={cn("p-4 rounded-2xl shadow-sm bg-white", colors[color])}>
+            {icon}
+          </div>
+        </div>
+        <h4 className="text-slate-400 text-xs font-black uppercase tracking-[0.2em] mb-1">{title}</h4>
+        <div className="min-h-[40px] flex items-start mb-3">
+          {subtitle && (
+            <p className="text-[10px] text-slate-400 font-medium leading-normal italic">
+              {subtitle}
+            </p>
+          )}
         </div>
       </div>
-      <h4 className="text-slate-400 text-xs font-black uppercase tracking-[0.2em] mb-2">{title}</h4>
-      <div className="text-4xl font-black text-slate-900 mb-2 tracking-tighter">{value}</div>
-      <p className="text-slate-500 text-xs font-medium leading-relaxed">{description}</p>
+      
+      <div className="mt-auto">
+        <div className="text-4xl font-black text-slate-900 mb-2 tracking-tighter">{value}</div>
+        <div className="min-h-[48px] flex items-start">
+          <p className="text-slate-500 text-xs font-medium leading-relaxed">
+            {description}
+          </p>
+        </div>
+      </div>
     </motion.div>
   );
 }

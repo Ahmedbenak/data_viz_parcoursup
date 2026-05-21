@@ -11,7 +11,7 @@ function cn(...inputs: ClassValue[]) {
 }
 
 interface TrackSelectionProps {
-  onSelect: (track: 'general' | 'pro' | 'techno') => void;
+  onSelect: (track: 'general' | 'pro') => void;
   onboardingData?: OnboardingData | null;
   setOnboardingComplete: (complete: boolean) => void;
 }
@@ -52,7 +52,7 @@ export default function TrackSelection({ onSelect, onboardingData, setOnboarding
           </p>
         </motion.div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
           {/* Bac Général */}
           <motion.button
             whileHover={{ y: -12, shadow: "var(--shadow-hover)" }}
@@ -75,32 +75,6 @@ export default function TrackSelection({ onSelect, onboardingData, setOnboarding
               Spécialités, études longues et universités. Analyse ton profil académique.
             </p>
             <div className="flex items-center gap-2 text-primary font-black text-xs uppercase tracking-wider mt-auto">
-              Continuer <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" />
-            </div>
-          </motion.button>
-
-          {/* Bac Technologique */}
-          <motion.button
-            whileHover={{ y: -12, shadow: "var(--shadow-hover)" }}
-            whileTap={{ scale: 0.98 }}
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4, duration: 0.6 }}
-            onClick={() => onSelect('techno')}
-            className="group relative p-8 bg-white border border-slate-100 rounded-[3rem] shadow-soft hover:border-emerald-500/30 transition-all text-left overflow-hidden"
-          >
-            <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
-              <Target className="w-20 h-20 text-emerald-500" />
-            </div>
-
-            <div className="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500">
-              <Target className="w-7 h-7 text-emerald-500" />
-            </div>
-            <h3 className="text-xl font-black text-slate-900 mb-3">Bac Techno</h3>
-            <p className="text-slate-500 text-xs leading-relaxed mb-8 font-medium">
-              Séries technologiques, BUT et écoles spécialisées. Découvre tes opportunités.
-            </p>
-            <div className="flex items-center gap-2 text-emerald-500 font-black text-xs uppercase tracking-wider mt-auto">
               Continuer <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" />
             </div>
           </motion.button>

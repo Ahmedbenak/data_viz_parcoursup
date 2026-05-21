@@ -206,7 +206,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [onboardingComplete, setOnboardingComplete] = useState(false);
   const [onboardingData, setOnboardingData] = useState<OnboardingData | null>(null);
-  const [bacType, setBacType] = useState<'general' | 'pro' | 'techno' | null>(null);
+  const [bacType, setBacType] = useState<'general' | 'pro' | null>(null);
   
   const [searchQuery, setSearchQuery] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -763,32 +763,6 @@ export default function App() {
 
   if (bacType === 'pro') {
     return <ProPage onBack={handleReset} onboardingData={onboardingData} setOnboardingComplete={setOnboardingComplete} />;
-  }
-
-  if (bacType === 'techno') {
-    return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-8">
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="text-center max-w-md bg-white p-12 rounded-[3rem] shadow-soft border border-slate-100"
-        >
-          <div className="w-20 h-20 bg-emerald-50 rounded-[2rem] flex items-center justify-center mb-8 mx-auto">
-            <Target className="w-10 h-10 text-emerald-500" />
-          </div>
-          <h2 className="text-3xl font-black text-slate-900 mb-4">Bac Technologique</h2>
-          <p className="text-slate-500 font-medium mb-8">
-            Cette section est en cours de préparation. Reviens bientôt pour découvrir les statistiques d'admission des séries technologiques !
-          </p>
-          <button 
-            onClick={handleReset}
-            className="px-8 py-3 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-colors"
-          >
-            Retour à l'accueil
-          </button>
-        </motion.div>
-      </div>
-    );
   }
 
   if (!onboardingComplete) {
