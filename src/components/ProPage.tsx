@@ -990,36 +990,23 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
         </div>
 
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12 max-w-4xl mx-auto">
           <KPICard 
             title="Taux d'emploi à 6 mois"
-            subtitle="Calculé parmi les diplômés qui recherchent un emploi après leurs études."
             value={stats.avgEmployment > 0 ? `${stats.avgEmployment.toFixed(2)}%` : "Donnée indisponible"}
             icon={<TrendingUp className="w-7 h-7" />}
-            description={selectedBacPro ? `Moyenne pour le ${selectedBacPro}` : "Moyenne nationale Bac Pro"}
+            tooltipText={`Calculé uniquement parmi les diplômés qui recherchent un emploi après leurs études.\n\n${selectedBacPro ? `Moyenne pour le ${selectedBacPro}` : "Moyenne nationale Bac Pro"}`}
             color="emerald"
           />
           <KPICard 
             title="Poursuite d'études"
-            subtitle={selectedBacPro 
-              ? `Calculé parmi l'ensemble des élèves de ce Bac Pro.` 
-              : "Calculé parmi l'ensemble des élèves de la formation."
-            }
             value={stats.avgStudies > 0 ? `${stats.avgStudies.toFixed(2)}%` : "Donnée indisponible"}
             icon={<GraduationCap className="w-7 h-7" />}
-            description={selectedBacPro 
-              ? `Parmi l'ensemble des élèves de la formation ${selectedBacPro}, ${stats.avgStudies > 0 ? stats.avgStudies.toFixed(2) : "0"}% décident de poursuivre leurs études.` 
-              : `Parmi l'ensemble des diplômés, ${stats.avgStudies > 0 ? stats.avgStudies.toFixed(2) : "0"}% décident de poursuivre leurs études.`
+            tooltipText={selectedBacPro 
+              ? `Parmi l'ensemble des élèves de la formation ${selectedBacPro}, ${stats.avgStudies > 0 ? stats.avgStudies.toFixed(2) : "0"}% décident de poursuivre leurs études.\n\nCalculé parmi l'ensemble des élèves de ce Bac Pro.` 
+              : `Parmi l'ensemble des diplômés, ${stats.avgStudies > 0 ? stats.avgStudies.toFixed(2) : "0"}% décident de poursuivre leurs études.\n\nCalculé parmi l'ensemble des élèves de la formation.`
             }
             color="blue"
-          />
-          <KPICard 
-            title="Formations analysées"
-            subtitle="Volume total de filières suivies dans cette étude."
-            value={stats.totalFormations > 0 ? stats.totalFormations.toString() : "0"}
-            icon={<Users className="w-7 h-7" />}
-            description={selectedBacPro ? "Données spécifiques à cette spécialité." : "Nombre de spécialités de Bac Pro suivies dans cette analyse."}
-            color="amber"
           />
         </div>
 
@@ -1380,7 +1367,7 @@ function NoDataMessage({ message = "Informations indisponibles pour cette format
   );
 }
 
-function KPICard({ title, subtitle, value, icon, description, color }: { title: string, subtitle?: string, value: string, icon: React.ReactNode, description: string, color: 'emerald' | 'blue' | 'amber' }) {
+function KPICard({ title, value, icon, tooltipText, color }: { title: string, value: string, icon: React.ReactNode, tooltipText: string, color: 'emerald' | 'blue' | 'amber' }) {
   const colors = {
     emerald: "bg-emerald-50/50 border-emerald-100/50 text-emerald-600",
     blue: "bg-blue-50/50 border-blue-100/50 text-blue-600",
@@ -1389,32 +1376,36 @@ function KPICard({ title, subtitle, value, icon, description, color }: { title: 
 
   return (
     <motion.div 
-      whileHover={{ y: -5, shadow: "var(--shadow-hover)" }}
-      className={cn("p-8 rounded-[2.5rem] border bg-white shadow-soft transition-all flex flex-col h-full justify-between", colors[color])}
+      whileHover={{ y: -4, shadow: "var(--shadow-hover)" }}
+      className={cn("p-6 rounded-[2rem] border bg-white shadow-soft transition-all flex flex-col justify-between relative min-h-[160px]", colors[color])}
     >
-      <div>
-        <div className="flex items-center justify-between mb-8">
-          <div className={cn("p-4 rounded-2xl shadow-sm bg-white", colors[color])}>
-            {icon}
+      <div className="flex items-center justify-between mb-4">
+        <div className={cn("p-3 rounded-xl shadow-xs bg-white", colors[color])}>
+          {icon}
+        </div>
+        
+        {/* Info Icon with Tooltip */}
+        <div className="relative group cursor-pointer p-1">
+          <Info className="w-4 h-4 text-slate-400 hover:text-slate-600 transition-colors" />
+          
+          {/* Tooltip Popup */}
+          <div className="absolute right-0 bottom-full mb-2 w-72 p-4 bg-slate-900 border border-slate-800 text-white rounded-2xl text-xs font-semibold shadow-xl opacity-0 translate-y-1 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200 z-50 leading-relaxed font-sans font-medium text-left">
+            <div className="relative">
+              {tooltipText.split('\n\n').map((para, idx) => (
+                <p key={idx} className={idx > 0 ? "mt-2 pt-2 border-t border-slate-800 text-slate-300" : "text-white"}>
+                  {para}
+                </p>
+              ))}
+              {/* Tooltip Arrow */}
+              <div className="absolute top-full right-2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-slate-900"></div>
+            </div>
           </div>
         </div>
-        <h4 className="text-slate-400 text-xs font-black uppercase tracking-[0.2em] mb-1">{title}</h4>
-        <div className="min-h-[40px] flex items-start mb-3">
-          {subtitle && (
-            <p className="text-[10px] text-slate-400 font-medium leading-normal italic">
-              {subtitle}
-            </p>
-          )}
-        </div>
       </div>
-      
-      <div className="mt-auto">
-        <div className="text-4xl font-black text-slate-900 mb-2 tracking-tighter">{value}</div>
-        <div className="min-h-[48px] flex items-start">
-          <p className="text-slate-500 text-xs font-medium leading-relaxed">
-            {description}
-          </p>
-        </div>
+
+      <div>
+        <h4 className="text-slate-400 text-[10px] font-black uppercase tracking-[0.15em] mb-1">{title}</h4>
+        <div className="text-3.5xl font-black text-slate-900 tracking-tighter">{value}</div>
       </div>
     </motion.div>
   );
