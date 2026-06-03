@@ -1393,7 +1393,7 @@ export default function App() {
                                 
                                 <div className="mt-2 pt-2 border-t border-slate-100 flex flex-col gap-2">
                                   <span className="text-[10px] text-slate-400 font-medium italic leading-tight block">
-                                    Note moyenne au bac pour les admis: {f.note_moyenne !== null ? `${f.note_moyenne.toFixed(2)}/20` : "N/A"}
+                                    Note moyenne au bac pour les admis: {f.note_moyenne !== null ? `${f.note_moyenne.toFixed(1)}/20` : "N/A"}
                                   </span>
                                   <span className="text-[10px] text-emerald-600 font-bold block">
                                     Part de boursiers: {f.pct_admis_neo_boursiers !== undefined ? `${f.pct_admis_neo_boursiers}%` : "N/A"}

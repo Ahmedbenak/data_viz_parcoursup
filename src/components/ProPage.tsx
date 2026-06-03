@@ -989,22 +989,38 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
           </div>
         </div>
 
+        {/* Notice Données Nationales */}
+        <div className="max-w-4xl mx-auto mb-6 bg-blue-50/50 border border-blue-100/50 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-2 w-2 rounded-full bg-blue-500 shrink-0" />
+            <div>
+              <span className="text-xs font-black text-slate-800 uppercase tracking-wider block">Indicateurs InserJeunes</span>
+              <p className="text-slate-500 text-[11px] font-medium leading-normal mt-0.5">
+                Chiffres et statistiques d'insertion professionnelle mesurés à l'échelle <strong className="text-slate-700">Nationale</strong>.
+              </p>
+            </div>
+          </div>
+          <span className="self-start sm:self-center text-[10px] text-blue-600 bg-blue-100/30 px-2.5 py-1 rounded-lg border border-blue-100/50 font-extrabold tracking-wider uppercase shrink-0">
+            Moyenne Nationale
+          </span>
+        </div>
+
         {/* KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12 max-w-4xl mx-auto">
           <KPICard 
             title="Taux d'emploi à 6 mois"
-            value={stats.avgEmployment > 0 ? `${stats.avgEmployment.toFixed(2)}%` : "Donnée indisponible"}
+            value={stats.avgEmployment > 0 ? `${stats.avgEmployment.toFixed(1)}%` : "Donnée indisponible"}
             icon={<TrendingUp className="w-7 h-7" />}
             tooltipText={`Calculé uniquement parmi les diplômés qui recherchent un emploi après leurs études.\n\n${selectedBacPro ? `Moyenne pour le ${selectedBacPro}` : "Moyenne nationale Bac Pro"}`}
             color="emerald"
           />
           <KPICard 
             title="Poursuite d'études"
-            value={stats.avgStudies > 0 ? `${stats.avgStudies.toFixed(2)}%` : "Donnée indisponible"}
+            value={stats.avgStudies > 0 ? `${stats.avgStudies.toFixed(1)}%` : "Donnée indisponible"}
             icon={<GraduationCap className="w-7 h-7" />}
             tooltipText={selectedBacPro 
-              ? `Parmi l'ensemble des élèves de la formation ${selectedBacPro}, ${stats.avgStudies > 0 ? stats.avgStudies.toFixed(2) : "0"}% décident de poursuivre leurs études.\n\nCalculé parmi l'ensemble des élèves de ce Bac Pro.` 
-              : `Parmi l'ensemble des diplômés, ${stats.avgStudies > 0 ? stats.avgStudies.toFixed(2) : "0"}% décident de poursuivre leurs études.\n\nCalculé parmi l'ensemble des élèves de la formation.`
+              ? `Parmi l'ensemble des élèves de la formation ${selectedBacPro}, ${stats.avgStudies > 0 ? stats.avgStudies.toFixed(1) : "0"}% décident de poursuivre leurs études.\n\nCalculé parmi l'ensemble des élèves de ce Bac Pro.` 
+              : `Parmi l'ensemble des diplômés, ${stats.avgStudies > 0 ? stats.avgStudies.toFixed(1) : "0"}% décident de poursuivre leurs études.\n\nCalculé parmi l'ensemble des élèves de la formation.`
             }
             color="blue"
           />
@@ -1015,6 +1031,7 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
           <ChartContainer 
             title={selectedBacPro ? "Ma formation parmi les meilleures de France" : "Top 10 des formations par taux d'emploi"} 
             icon={<BarChart3 className="w-6 h-6" />}
+            isNational={true}
           >
             <div className="mb-8 p-6 bg-slate-50 rounded-3xl border border-slate-100">
               <p className="text-sm text-slate-600 leading-relaxed font-medium font-sans">
@@ -1041,7 +1058,7 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
                     />
                     <Tooltip 
                       contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                      formatter={(value: number) => [`${value.toFixed(2)}%`, "Taux d'emploi"]}
+                      formatter={(value: number) => [`${value.toFixed(1)}%`, "Taux d'emploi"]}
                     />
                     <Bar dataKey="value" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={20}>
                       {topFormations.map((entry, index) => {
@@ -1076,7 +1093,7 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
           {/* Evolution Chart */}
-          <ChartContainer title="Évolution du taux d'emploi (2019-2024)" icon={<Calendar className="w-5 h-5" />}>
+          <ChartContainer title="Évolution du taux d'emploi (2019-2024)" icon={<Calendar className="w-5 h-5" />} isNational={true}>
             <div className="h-[300px] w-full">
               {evolutionData.length > 0 && evolutionData.some(d => d.value > 0) ? (
                 <ResponsiveContainer width="100%" height="100%">
@@ -1086,7 +1103,7 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
                     <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} unit="%" domain={['auto', 'auto']} />
                     <Tooltip 
                       contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                      formatter={(value: number) => [`${value.toFixed(2)}%`, "Taux d'emploi"]}
+                      formatter={(value: number) => [`${value.toFixed(1)}%`, "Taux d'emploi"]}
                     />
                     <Line 
                       type="monotone" 
@@ -1104,7 +1121,7 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
           </ChartContainer>
 
           {/* Outcome Pie Chart */}
-          <ChartContainer title="Devenir des diplômés (à 6 mois)" icon={<PieChartIcon className="w-5 h-5" />}>
+          <ChartContainer title="Devenir des diplômés (à 6 mois)" icon={<PieChartIcon className="w-5 h-5" />} isNational={true}>
             <div className="h-[300px] w-full flex items-center justify-center">
               {outcomeData.length > 0 && outcomeData.some(d => d.value > 0) ? (
                 <ResponsiveContainer width="100%" height="100%">
@@ -1124,7 +1141,7 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
                     </Pie>
                     <Tooltip 
                       contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                      formatter={(value: number) => [`${value.toFixed(2)}%`, "Part"]}
+                      formatter={(value: number) => [`${value.toFixed(1)}%`, "Part"]}
                     />
                     <Legend verticalAlign="bottom" height={36}/>
                   </PieChart>
@@ -1276,7 +1293,7 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
                               <div className="bg-slate-50 p-2 rounded-lg">
                                 <span className="block text-[10px] text-slate-400 uppercase font-bold">Taux Accès</span>
                                 <span className="text-sm font-bold text-primary">
-                                  {f.taux_acces !== null ? `${f.taux_acces.toFixed(2)}%` : "Inconnu"}
+                                  {f.taux_acces !== null ? `${f.taux_acces.toFixed(1)}%` : "Inconnu"}
                                 </span>
                               </div>
                               <div className="bg-slate-50 p-2 rounded-lg">
@@ -1287,13 +1304,13 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
                             
                             <div className="mt-2 pt-2 border-t border-slate-100 flex flex-col gap-2">
                               <span className="text-[10px] text-slate-400 font-medium italic leading-tight block">
-                                Note moyenne au bac pour les admis: {f.note_moyenne !== null ? `${f.note_moyenne.toFixed(2)}/20` : "N/A"}
+                                Note moyenne au bac pour les admis: {f.note_moyenne !== null ? `${f.note_moyenne.toFixed(1)}/20` : "N/A"}
                               </span>
                               <span className="text-[10px] text-emerald-600 font-bold block">
-                                Part de boursiers: {f.pct_admis_neo_boursiers !== undefined ? `${f.pct_admis_neo_boursiers.toFixed(2)}%` : "N/A"}
+                                Part de boursiers: {f.pct_admis_neo_boursiers !== undefined ? `${f.pct_admis_neo_boursiers.toFixed(1)}%` : "N/A"}
                               </span>
                               <span className="text-[10px] text-slate-400 font-medium italic leading-tight block">
-                                % Bac Pro admis: {f.pct_admis_neo_pro.toFixed(2)}%
+                                % Bac Pro admis: {f.pct_admis_neo_pro.toFixed(1)}%
                               </span>
                               {f.lien_parcoursup && (
                                 <a 
@@ -1376,17 +1393,22 @@ function KPICard({ title, value, icon, tooltipText, color }: { title: string, va
 
   return (
     <motion.div 
-      whileHover={{ y: -4, shadow: "var(--shadow-hover)" }}
-      className={cn("p-6 rounded-[2rem] border bg-white shadow-soft transition-all flex flex-col justify-between relative min-h-[160px]", colors[color])}
+      whileHover={{ y: -3, shadow: "var(--shadow-hover)" }}
+      className={cn("p-4 rounded-2xl border bg-white shadow-soft transition-all flex flex-col justify-between relative min-h-[110px]", colors[color])}
     >
-      <div className="flex items-center justify-between mb-4">
-        <div className={cn("p-3 rounded-xl shadow-xs bg-white", colors[color])}>
-          {icon}
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <div className={cn("p-2 rounded-lg shadow-xs bg-white", colors[color])}>
+            {icon}
+          </div>
+          <span className="text-[9px] font-black text-blue-600 bg-blue-50 border border-blue-100/50 px-1.5 py-0.5 rounded uppercase tracking-wider">
+            National
+          </span>
         </div>
         
         {/* Info Icon with Tooltip */}
         <div className="relative group cursor-pointer p-1">
-          <Info className="w-4 h-4 text-slate-400 hover:text-slate-600 transition-colors" />
+          <Info className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 transition-colors" />
           
           {/* Tooltip Popup */}
           <div className="absolute right-0 bottom-full mb-2 w-72 p-4 bg-slate-900 border border-slate-800 text-white rounded-2xl text-xs font-semibold shadow-xl opacity-0 translate-y-1 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200 z-50 leading-relaxed font-sans font-medium text-left">
@@ -1404,27 +1426,34 @@ function KPICard({ title, value, icon, tooltipText, color }: { title: string, va
       </div>
 
       <div>
-        <h4 className="text-slate-400 text-[10px] font-black uppercase tracking-[0.15em] mb-1">{title}</h4>
-        <div className="text-3.5xl font-black text-slate-900 tracking-tighter">{value}</div>
+        <h4 className="text-slate-400 text-[10px] font-black uppercase tracking-[0.12em] mb-0.5">{title}</h4>
+        <div className="text-2xl font-black text-slate-900 tracking-tighter">{value}</div>
       </div>
     </motion.div>
   );
 }
 
-function ChartContainer({ title, icon, children }: { title: string, icon: React.ReactNode, children: React.ReactNode }) {
+function ChartContainer({ title, icon, children, isNational = false }: { title: string, icon: React.ReactNode, children: React.ReactNode, isNational?: boolean }) {
   return (
     <motion.div 
-      initial={{ opacity: 0, y: 30 }}
+      initial={{ opacity: 0, y: 15 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
-      transition={{ duration: 0.6 }}
-      className="bg-white p-10 md:p-12 rounded-[3.5rem] border border-slate-100 shadow-soft"
+      transition={{ duration: 0.4 }}
+      className="bg-white p-5 md:p-6 rounded-2xl border border-slate-100 shadow-soft"
     >
-      <div className="flex items-center gap-4 mb-12">
-        <div className="p-3 bg-slate-50 rounded-2xl text-slate-400">
-          {icon}
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-slate-50 rounded-xl text-slate-400">
+            {icon}
+          </div>
+          <h3 className="text-lg font-black text-slate-900 tracking-tight">{title}</h3>
         </div>
-        <h3 className="text-2xl font-black text-slate-900 tracking-tight">{title}</h3>
+        {isNational && (
+          <span className="text-[9px] font-black text-blue-600 bg-blue-50 border border-blue-100/50 px-2 py-0.5 rounded uppercase tracking-wider">
+            Données Nationales - InserJeunes
+          </span>
+        )}
       </div>
       {children}
     </motion.div>
