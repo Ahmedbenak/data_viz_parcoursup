@@ -797,23 +797,23 @@ export default function StatsPanel({
         )}
 
         {/* Overview Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <motion.div 
           initial={isExporting ? false : { opacity: 0, y: 20 }}
           animate={isExporting ? { opacity: 1, y: 0 } : undefined}
           whileInView={isExporting ? undefined : { opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          whileHover={{ y: -10, shadow: "var(--shadow-hover)" }}
-          className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-soft transition-all"
+          whileHover={{ y: -5, shadow: "var(--shadow-hover)" }}
+          className="bg-white p-5 rounded-2xl border border-slate-100 shadow-soft transition-all"
         >
-          <div className="flex items-center gap-4 mb-6">
-            <div className="p-3 bg-blue-50 rounded-2xl text-blue-600">
-              <GraduationCap className="w-6 h-6" />
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2.5 bg-blue-50 rounded-xl text-blue-600">
+              <GraduationCap className="w-5 h-5" />
             </div>
-            <span className="text-xs font-black text-slate-400 uppercase tracking-[0.15em]">Formations</span>
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.12em]">Formations</span>
           </div>
-          <div className="text-5xl font-black text-slate-900 tracking-tighter">{overview.count}</div>
-          <p className="text-sm text-slate-400 mt-2 font-bold">Formations analysées</p>
+          <div className="text-3.5xl font-black text-slate-900 tracking-tighter">{overview.count}</div>
+          <p className="text-[11px] text-slate-400 mt-1 font-bold">Formations analysées</p>
         </motion.div>
 
         <motion.div 
@@ -822,17 +822,17 @@ export default function StatsPanel({
           whileInView={isExporting ? undefined : { opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ delay: 0.1 }}
-          whileHover={{ y: -10, shadow: "var(--shadow-hover)" }}
-          className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-soft transition-all"
+          whileHover={{ y: -5, shadow: "var(--shadow-hover)" }}
+          className="bg-white p-5 rounded-2xl border border-slate-100 shadow-soft transition-all"
         >
-          <div className="flex items-center gap-4 mb-6">
-            <div className="p-3 bg-emerald-50 rounded-2xl text-emerald-600">
-              <Users className="w-6 h-6" />
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2.5 bg-emerald-50 rounded-xl text-emerald-600">
+              <Users className="w-5 h-5" />
             </div>
-            <span className="text-xs font-black text-slate-400 uppercase tracking-[0.15em]">Moyenne des places</span>
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.12em]">Moyenne des places</span>
           </div>
-          <div className="text-5xl font-black text-slate-900 tracking-tighter">{overview.avgPlaces.toLocaleString()}</div>
-          <p className="text-sm text-slate-400 mt-2 font-bold">Par formation (moyenne)</p>
+          <div className="text-3.5xl font-black text-slate-900 tracking-tighter">{overview.avgPlaces.toLocaleString()}</div>
+          <p className="text-[11px] text-slate-400 mt-1 font-bold">Par formation (moyenne)</p>
         </motion.div>
 
         <motion.div 
@@ -841,39 +841,39 @@ export default function StatsPanel({
           whileInView={isExporting ? undefined : { opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ delay: 0.2 }}
-          whileHover={{ y: -10, shadow: "var(--shadow-hover)" }}
-          className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-soft sm:col-span-2 lg:col-span-1 transition-all"
+          whileHover={{ y: -5, shadow: "var(--shadow-hover)" }}
+          className="bg-white p-5 rounded-2xl border border-slate-100 shadow-soft sm:col-span-2 lg:col-span-1 transition-all"
         >
-          <div className="flex items-center gap-4 mb-6">
-            <div className="p-3 bg-purple-50 rounded-2xl text-purple-600">
-              <Target className="w-6 h-6" />
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2.5 bg-purple-50 rounded-xl text-purple-600">
+              <Target className="w-5 h-5" />
             </div>
-            <span className="text-xs font-black text-slate-400 uppercase tracking-[0.15em]">Sélectivité</span>
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.12em]">Sélectivité</span>
           </div>
-          <div className="flex items-end gap-3">
-            <div className="text-5xl font-black text-slate-900 tracking-tighter">{overview.selectivePct}%</div>
-            <div className="text-xs text-slate-400 mb-2 font-black uppercase tracking-wider">Sélectives</div>
+          <div className="flex items-end gap-2">
+            <div className="text-3.5xl font-black text-slate-900 tracking-tighter">{overview.selectivePct}%</div>
+            <div className="text-[10px] text-slate-400 mb-1.5 font-black uppercase tracking-wider">Sélectives</div>
           </div>
-          <div className="w-full h-4 bg-slate-100 rounded-full mt-6 overflow-hidden p-1 shadow-inner">
+          <div className="w-full h-3 bg-slate-100 rounded-full mt-4 overflow-hidden p-[2px] shadow-inner">
             <div className="h-full bg-purple-500 rounded-full" style={{ width: `${overview.selectivePct}%` }} />
           </div>
         </motion.div>
       </div>
 
       {/* Profil des Admis Section */}
-      <div className="bg-white p-10 md:p-16 rounded-[4rem] border border-slate-100 shadow-soft relative overflow-hidden">
-        <div className="absolute top-0 right-0 p-12 opacity-[0.03] pointer-events-none">
-          <UserCheck className="w-64 h-64 text-indigo-600" />
+      <div className="bg-white p-6 md:p-8 rounded-3xl border border-slate-100 shadow-soft relative overflow-hidden">
+        <div className="absolute top-0 right-0 p-8 opacity-[0.03] pointer-events-none">
+          <UserCheck className="w-48 h-48 text-indigo-600" />
         </div>
         
-        <div className="flex items-center gap-4 mb-16">
-          <div className="w-14 h-14 bg-indigo-50 rounded-[1.25rem] flex items-center justify-center">
-            <UserCheck className="w-7 h-7 text-indigo-600" />
+        <div className="flex items-center gap-3 mb-8">
+          <div className="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center">
+            <UserCheck className="w-6 h-6 text-indigo-600" />
           </div>
-          <h4 className="text-3xl font-black text-slate-900 tracking-tight">Profil type des admis</h4>
+          <h4 className="text-2xl font-black text-slate-900 tracking-tight">Profil type des admis</h4>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-16">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Bac Types */}
           <div className="space-y-8">
             <div className="text-center">
@@ -918,28 +918,28 @@ export default function StatsPanel({
       </div>
 
       {/* Main Analysis Section: Accessibility (Left) & Comparison (Right) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Accessibility Section (Left) */}
         <div className={cn(
-          "bg-white p-10 md:p-12 rounded-[4rem] border border-slate-100 shadow-soft transition-all duration-700 relative overflow-hidden",
+          "bg-white p-6 md:p-8 rounded-3xl border border-slate-100 shadow-soft transition-all duration-700 relative overflow-hidden",
           (localUserNote === null || localUserNote === 0) && "bg-slate-50 border-dashed border-2"
         )}>
           {(localUserNote === null || localUserNote === 0) && (
-            <div className="absolute inset-0 z-10 bg-slate-50/60 backdrop-blur-[4px] flex items-center justify-center p-12 text-center">
+            <div className="absolute inset-0 z-10 bg-slate-50/60 backdrop-blur-[4px] flex items-center justify-center p-6 text-center">
               <motion.div 
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
-                className="bg-white p-10 rounded-[3rem] shadow-hover border border-slate-100 max-w-sm w-full"
+                className="bg-white p-6 rounded-2xl shadow-hover border border-slate-100 max-w-sm w-full"
               >
-                <div className="w-16 h-16 bg-primary-light rounded-[1.5rem] flex items-center justify-center mx-auto mb-6">
-                  <Target className="w-8 h-8 text-primary" />
+                <div className="w-14 h-14 bg-primary-light rounded-xl flex items-center justify-center mx-auto mb-4">
+                  <Target className="w-7 h-7 text-primary" />
                 </div>
-                <h5 className="text-2xl font-black text-slate-900 mb-3 tracking-tight">Potentiel d'admission</h5>
-                <p className="text-sm text-slate-500 font-medium mb-8 leading-relaxed">
+                <h5 className="text-xl font-black text-slate-900 mb-2 tracking-tight">Potentiel d'admission</h5>
+                <p className="text-xs text-slate-500 font-medium mb-6 leading-relaxed">
                   Saisis ta moyenne pour débloquer l'analyse prédictive de tes chances d'admission.
                 </p>
-                <div className="flex flex-col gap-4 items-center justify-center bg-slate-50 p-8 rounded-[2.5rem] border border-slate-100 mb-6">
-                  <div className="flex items-center gap-4">
+                <div className="flex flex-col gap-3 items-center justify-center bg-slate-50 p-6 rounded-2xl border border-slate-100 mb-4">
+                  <div className="flex items-center gap-3">
                     <input 
                       type="text" 
                       inputMode="decimal"
@@ -948,14 +948,14 @@ export default function StatsPanel({
                       value={inputValue}
                       onChange={(e) => setInputValue(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleValidate()}
-                      className="w-24 bg-white border-2 border-slate-100 p-3 rounded-2xl text-3xl font-black text-primary text-center focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none transition-all"
+                      className="w-20 bg-white border border-slate-200 p-2 rounded-xl text-2xl font-black text-primary text-center focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none transition-all"
                     />
-                    <span className="text-slate-300 font-black text-2xl">/ 20</span>
+                    <span className="text-slate-300 font-black text-xl">/ 20</span>
                   </div>
                   <button 
                     onClick={handleValidate}
                     disabled={!inputValue || isNaN(parseFloat(inputValue.replace(',', '.')))}
-                    className="w-full py-3 bg-primary text-white rounded-xl font-bold hover:bg-primary-hover transition-all shadow-lg shadow-primary/20 disabled:opacity-50 disabled:shadow-none"
+                    className="w-full py-2.5 bg-primary text-white rounded-lg font-bold hover:bg-primary-hover transition-all shadow-lg shadow-primary/20 disabled:opacity-50 disabled:shadow-none text-xs"
                   >
                     Valider ma note
                   </button>
@@ -964,13 +964,15 @@ export default function StatsPanel({
             </div>
           )}
           
-          <div className="flex items-center justify-between mb-12">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 bg-emerald-50 rounded-[1.25rem] flex items-center justify-center">
-                <Target className="w-7 h-7 text-emerald-600" />
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center">
+                <Target className="w-6 h-6 text-emerald-600" />
               </div>
-              <h4 className="text-3xl font-black text-slate-900 tracking-tight">Ton Potentiel</h4>
-              <p className="text-sm font-bold text-slate-400 mt-1">change ta moyenne attendue pour voir tes chances d'accès aux formations</p>
+              <div>
+                <h4 className="text-2xl font-black text-slate-900 tracking-tight">Ton Potentiel</h4>
+                <p className="text-[10px] font-bold text-slate-400 mt-0.5">change ta moyenne attendue pour voir tes chances d'accès aux formations</p>
+              </div>
             </div>
             {localUserNote !== null && (
               <div className="flex items-center gap-4">
@@ -1051,7 +1053,7 @@ export default function StatsPanel({
                   items: segments.level.items,
                   color: 'amber', 
                   icon: Info,
-                  desc: "Ta note correspond exactement au profil type.",
+                  desc: "Ta note correspond au profil type.",
                   advice: "Tes chances sont très sérieuses."
                 },
                 { 
@@ -1062,41 +1064,41 @@ export default function StatsPanel({
                   color: 'rose', 
                   icon: AlertTriangle,
                   desc: "Ta note est un peu juste par rapport aux admis.",
-                  advice: "Nécessite un dossier exceptionnel."
+                  advice: "Dossier exceptionnel requis."
                 }
               ].map((seg, i) => (
                 <motion.div 
                   key={i} 
                   whileHover={{ x: 5 }}
                   className={cn(
-                    "p-5 rounded-[2.5rem] border transition-all flex flex-col sm:flex-row items-center gap-4 sm:gap-6",
+                    "p-3.5 px-5 rounded-2xl border transition-all flex flex-col sm:flex-row items-center gap-3 sm:gap-4",
                     seg.color === 'emerald' ? "bg-emerald-50/20 border-emerald-100" :
                     seg.color === 'amber' ? "bg-amber-50/20 border-amber-100" :
                     "bg-rose-50/20 border-rose-100"
                   )}
                 >
                   <div className={cn(
-                    "w-12 h-12 rounded-[1rem] flex items-center justify-center shrink-0 shadow-sm",
+                    "w-10 h-10 rounded-lg flex items-center justify-center shrink-0 shadow-xs",
                     seg.color === 'emerald' ? "bg-white text-emerald-600 border border-emerald-100" :
                     seg.color === 'amber' ? "bg-white text-amber-600 border border-amber-100" :
                     "bg-white text-rose-600 border border-rose-100"
                   )}>
-                    <seg.icon className="w-6 h-6" />
+                    <seg.icon className="w-5 h-5" />
                   </div>
                   <div className="flex-1 min-w-0 text-center sm:text-left">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-1">
-                      <span className={cn("text-[10px] font-black uppercase tracking-[0.2em] px-2 py-0.5 rounded-full self-center sm:self-start", 
+                      <span className={cn("text-[9px] font-black uppercase tracking-[0.15em] px-2 py-0.5 rounded-full self-center sm:self-start", 
                         seg.color === 'emerald' ? "bg-emerald-100 text-emerald-700" :
                         seg.color === 'amber' ? "bg-amber-100 text-amber-700" :
                         "bg-rose-100 text-rose-700"
                       )}>
                         {seg.label}
                       </span>
-                      <span className="text-xl font-black text-slate-900 tracking-tighter">
-                        {seg.count} <span className="text-[10px] text-slate-400 uppercase font-bold tracking-normal">formations</span>
+                      <span className="text-lg font-black text-slate-900 tracking-tighter">
+                        {seg.count} <span className="text-[9px] text-slate-400 uppercase font-bold tracking-normal">formations</span>
                       </span>
                     </div>
-                    <p className="text-xs text-slate-600 font-medium leading-relaxed">
+                    <p className="text-[11px] text-slate-600 font-medium leading-relaxed">
                       {seg.desc} <span className="text-slate-400 italic sm:ml-1">{seg.advice}</span>
                     </p>
                   </div>
@@ -1122,12 +1124,12 @@ export default function StatsPanel({
             </div>
 
             {/* Final Advice */}
-            <div className="mt-8 p-8 bg-slate-900 rounded-[2.5rem] text-white flex items-start gap-6 shadow-2xl shadow-slate-900/20">
-              <div className="p-3 bg-white/10 rounded-2xl">
-                <Lightbulb className="w-6 h-6 text-primary" />
+            <div className="mt-4 p-5 bg-slate-900 rounded-2xl text-white flex items-start gap-4 shadow-xl shadow-slate-900/20">
+              <div className="p-2.5 bg-white/10 rounded-xl">
+                <Lightbulb className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <p className="text-sm font-bold leading-relaxed">
+                <p className="text-xs font-bold leading-relaxed">
                   {segments.accessible.count > 0 
                     ? `Tu as ${segments.accessible.count} formations "Sécure". C'est excellent pour garantir ton admission !`
                     : "Attention, tu n'as aucune formation 'Sécure'. Pense à élargir tes vœux pour plus de sécurité."}
@@ -1138,17 +1140,17 @@ export default function StatsPanel({
         </div>
 
         {/* Comparison Section (Right) */}
-        <div className="bg-white p-10 md:p-12 rounded-[4rem] border border-slate-100 shadow-soft flex flex-col">
+        <div className="bg-white p-6 md:p-8 rounded-3xl border border-slate-100 shadow-soft flex flex-col w-full">
           <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 bg-slate-50 rounded-[1.25rem] flex items-center justify-center">
-                <MapPin className="w-7 h-7 text-slate-600" />
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center">
+                <MapPin className="w-6 h-6 text-slate-600" />
               </div>
-              <h4 className="text-3xl font-black text-slate-900 tracking-tight">Comparaison</h4>
+              <h4 className="text-2xl font-black text-slate-900 tracking-tight">Comparaison</h4>
             </div>
           </div>
 
-          <div className="flex-1 flex flex-col space-y-6">
+          <div className="flex-1 flex flex-col space-y-4">
             {loading && !nationalProfile ? (
               <div className="flex-1 flex flex-col items-center justify-center space-y-4 py-20">
                 <Loader2 className="w-12 h-12 text-primary animate-spin" />
@@ -1191,33 +1193,33 @@ export default function StatsPanel({
                   animate={isExporting ? { opacity: 1, x: 0 } : undefined}
                   whileInView={isExporting ? undefined : { opacity: 1, x: 0 }}
                   transition={{ delay: isExporting ? 0 : i * 0.1 }}
-                  className="bg-slate-50 border border-slate-100 rounded-[2rem] p-6 group hover:bg-white hover:shadow-xl hover:scale-[1.02] transition-all duration-300"
+                  className="bg-slate-50 border border-slate-100 rounded-xl p-4 group hover:bg-white hover:shadow-lg transition-all duration-300"
                 >
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">{item.label}</span>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.12em]">{item.label}</span>
                   </div>
                   
-                  <div className="flex items-end justify-between gap-4">
+                  <div className="flex items-end justify-between gap-3">
                     <div className="flex flex-col">
-                      <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">National</span>
-                      <div className="text-2xl font-black text-slate-900 tracking-tighter">
+                      <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-0.5">National</span>
+                      <div className="text-xl font-black text-slate-900 tracking-tighter">
                         {item.isNote ? item.nat.toFixed(1) : (item.isPct ? item.nat.toFixed(1) : item.nat)}{item.isPct ? '%' : ''}
                       </div>
                     </div>
 
                     {selectedDepartment && (
                       <div className="flex flex-col text-right">
-                        <span className="text-[9px] font-black text-primary/60 uppercase tracking-widest mb-1">{selectedDepartment}</span>
-                        <div className="text-4xl font-black text-primary tracking-tighter">
+                        <span className="text-[9px] font-black text-[#E30613]/60 uppercase tracking-widest mb-0.5">{selectedDepartment}</span>
+                        <div className="text-2.5xl font-black text-[#E30613] tracking-tighter">
                           {item.isNote ? item.val.toFixed(1) : (item.isPct ? item.val.toFixed(1) : item.val)}{item.isPct ? '%' : ''}
-                          {item.hasStar && <span className="text-xl ml-1">*</span>}
+                          {item.hasStar && <span className="text-base ml-0.5">*</span>}
                         </div>
                       </div>
                     )}
                   </div>
 
-                  <div className="mt-4 pt-4 border-t border-slate-200/50">
-                    <p className="text-[10px] text-slate-500 font-bold leading-relaxed opacity-80 italic">
+                  <div className="mt-2 pt-2 border-t border-slate-200/40">
+                    <p className="text-[9px] text-slate-500 font-bold leading-normal opacity-80 italic">
                       {item.desc}
                     </p>
                   </div>

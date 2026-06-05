@@ -40,6 +40,9 @@ export interface DevenirSlice {
 export interface EvolutionPoint {
   annee: string;
   taux_emploi_6mois: number | null;
+  taux_emploi_12mois: number | null;
+  taux_emploi_18mois: number | null;
+  taux_emploi_24mois: number | null;
 }
 
 export interface TopFormation {
@@ -177,7 +180,7 @@ export async function fetchEmploymentEvolution(
 
   const { data, error } = await supabase
     .from(TABLE)
-    .select('annee, avg_taux_emploi_6mois')
+    .select('annee, avg_taux_emploi_6mois, avg_taux_emploi_12mois, avg_taux_emploi_18mois, avg_taux_emploi_24mois')
     .eq('libelle_formation', target)
     .in('annee', HISTORICAL_YEARS as unknown as string[])
     .order('annee', { ascending: true });
@@ -186,6 +189,9 @@ export async function fetchEmploymentEvolution(
   return (data ?? []).map(r => ({
     annee: r.annee,
     taux_emploi_6mois: n(r.avg_taux_emploi_6mois),
+    taux_emploi_12mois: n(r.avg_taux_emploi_12mois),
+    taux_emploi_18mois: n(r.avg_taux_emploi_18mois),
+    taux_emploi_24mois: n(r.avg_taux_emploi_24mois),
   }));
 }
 

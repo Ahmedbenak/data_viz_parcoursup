@@ -786,6 +786,7 @@ export default function App() {
           loadingSpecialties={loading}
           allFormationTypes={allFormationTypes}
           allDepartments={allDepartments}
+          onBack={handleReset}
         />
       </div>
     );
@@ -795,17 +796,6 @@ export default function App() {
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-primary-light selection:text-primary relative">
       <Header onboardingData={onboardingData} setOnboardingComplete={setOnboardingComplete} onHome={handleReset} />
       
-      {/* Floating Back Button */}
-      <div className="fixed top-28 left-8 z-[100] no-print">
-        <button 
-          onClick={handleReset}
-          className="flex items-center gap-2 px-5 py-2.5 bg-slate-900/90 backdrop-blur-sm text-white rounded-full font-bold shadow-xl hover:bg-slate-800 transition-all hover:scale-105 active:scale-95 group border border-white/20 text-sm"
-        >
-          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-          <span>Retour à l'accueil</span>
-        </button>
-      </div>
-
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
 
         {/* Hero / Selection */}
@@ -937,63 +927,7 @@ export default function App() {
         </section>
 
         {selectedSpecialty ? (
-          <div className="lg:grid lg:grid-cols-[80px_1fr] gap-12 animate-in fade-in slide-in-from-bottom-4 duration-700 relative">
-            {/* Sidebar Guide - Sticky Vertical Rail */}
-            <aside className="hidden lg:block">
-              <div className="sticky top-40 space-y-24">
-                {/* Phase 1 */}
-                <div 
-                  className={cn(
-                    "flex flex-col items-center cursor-pointer group transition-all duration-500",
-                    activePhase === 1 ? "opacity-100" : "opacity-30 hover:opacity-100"
-                  )}
-                  onClick={() => document.getElementById('section-phase-1')?.scrollIntoView({ behavior: 'smooth' })}
-                >
-                  <div className="[writing-mode:vertical-rl] rotate-180 whitespace-nowrap text-[13px] font-black uppercase tracking-[0.25em] text-slate-500 group-hover:text-primary transition-colors mb-6">
-                    1. Synthèse Admission
-                  </div>
-                  <div className={cn(
-                    "w-1 h-12 rounded-full transition-all duration-700",
-                    activePhase === 1 ? "bg-primary shadow-[0_0_15px_rgba(227,6,19,0.6)]" : "bg-slate-200"
-                  )} />
-                </div>
-
-                {/* Phase 2 */}
-                <div 
-                  className={cn(
-                    "flex flex-col items-center cursor-pointer group transition-all duration-500",
-                    activePhase === 2 ? "opacity-100" : "opacity-30 hover:opacity-100"
-                  )}
-                  onClick={() => document.getElementById('section-phase-2')?.scrollIntoView({ behavior: 'smooth' })}
-                >
-                  <div className="[writing-mode:vertical-rl] rotate-180 whitespace-nowrap text-[13px] font-black uppercase tracking-[0.25em] text-slate-500 group-hover:text-primary transition-colors mb-6">
-                    2. Comparaison Régionale
-                  </div>
-                  <div className={cn(
-                    "w-1 h-12 rounded-full transition-all duration-700",
-                    activePhase === 2 ? "bg-primary shadow-[0_0_15px_rgba(227,6,19,0.6)]" : "bg-slate-200"
-                  )} />
-                </div>
-
-                {/* Phase 3 */}
-                <div 
-                  className={cn(
-                    "flex flex-col items-center cursor-pointer group transition-all duration-500",
-                    activePhase === 3 ? "opacity-100" : "opacity-30 hover:opacity-100"
-                  )}
-                  onClick={() => document.getElementById('section-phase-3')?.scrollIntoView({ behavior: 'smooth' })}
-                >
-                  <div className="[writing-mode:vertical-rl] rotate-180 whitespace-nowrap text-[13px] font-black uppercase tracking-[0.25em] text-slate-500 group-hover:text-primary transition-colors mb-6">
-                    3. Carte Interactive
-                  </div>
-                  <div className={cn(
-                    "w-1 h-12 rounded-full transition-all duration-700",
-                    activePhase === 3 ? "bg-primary shadow-[0_0_15px_rgba(227,6,19,0.6)]" : "bg-slate-200"
-                  )} />
-                </div>
-              </div>
-            </aside>
-
+          <div className="lg:grid lg:grid-cols-1 gap-12 animate-in fade-in slide-in-from-bottom-4 duration-700 relative">
             <div id="section-phase-1" className="space-y-8 relative scroll-mt-32">
               {loadingDetails && (
               <div className="absolute inset-0 bg-white/40 backdrop-blur-[2px] z-10 flex items-center justify-center rounded-3xl">

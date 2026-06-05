@@ -36,7 +36,9 @@ import {
   PieChart, 
   Pie, 
   Cell,
-  Legend
+  Legend,
+  ReferenceArea,
+  Label
 } from 'recharts';
 import { 
   MapContainer, 
@@ -855,17 +857,6 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
     <div className="min-h-screen bg-slate-50 pb-20">
       <Header onboardingData={onboardingData} setOnboardingComplete={setOnboardingComplete} onHome={onBack} />
       
-      {/* Floating Back Button */}
-      <div className="fixed top-28 left-8 z-[100] no-print">
-        <button 
-          onClick={onBack}
-          className="flex items-center gap-2 px-5 py-2.5 bg-slate-900/90 backdrop-blur-sm text-white rounded-full font-bold shadow-xl hover:bg-slate-800 transition-all hover:scale-105 active:scale-95 group border border-white/20 text-sm"
-        >
-          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-          <span>Retour à l'accueil</span>
-        </button>
-      </div>
-
       <main className="max-w-7xl mx-auto px-6 sm:px-10 py-12">
 
         {/* Bac Pro Selection Bar */}
@@ -990,19 +981,11 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
         </div>
 
         {/* Notice Données Nationales */}
-        <div className="max-w-4xl mx-auto mb-6 bg-blue-50/50 border border-blue-100/50 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-2 w-2 rounded-full bg-blue-500 shrink-0" />
-            <div>
-              <span className="text-xs font-black text-slate-800 uppercase tracking-wider block">Indicateurs InserJeunes</span>
-              <p className="text-slate-500 text-[11px] font-medium leading-normal mt-0.5">
-                Chiffres et statistiques d'insertion professionnelle mesurés à l'échelle <strong className="text-slate-700">Nationale</strong>.
-              </p>
-            </div>
-          </div>
-          <span className="self-start sm:self-center text-[10px] text-blue-600 bg-blue-100/30 px-2.5 py-1 rounded-lg border border-blue-100/50 font-extrabold tracking-wider uppercase shrink-0">
-            Moyenne Nationale
-          </span>
+        <div className="max-w-4xl mx-auto mb-8 bg-slate-50 border border-slate-200 p-4 rounded-xl flex items-center gap-3">
+          <Info className="w-4 h-4 text-slate-400 shrink-0" />
+          <p className="text-slate-500 text-xs font-medium">
+            Ces indicateurs sont des moyennes nationales calculées sur la France entière.
+          </p>
         </div>
 
         {/* KPI Cards */}
@@ -1029,19 +1012,10 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
         <div className="grid grid-cols-1 gap-12 mb-12">
           {/* Top Formations */}
           <ChartContainer 
-            title={selectedBacPro ? "Ma formation parmi les meilleures de France" : "Top 10 des formations par taux d'emploi"} 
+            title="Top 10 : Taux d'emploi à 6 mois (National)" 
             icon={<BarChart3 className="w-6 h-6" />}
-            isNational={true}
           >
-            <div className="mb-8 p-6 bg-slate-50 rounded-3xl border border-slate-100">
-              <p className="text-sm text-slate-600 leading-relaxed font-medium font-sans">
-                {selectedBacPro 
-                  ? `Votre spécialité (${selectedBacPro}) est mise en surbrillance bleue pour vous permettre de situer ses performances d'insertion à 6 mois par rapport aux formations les plus porteuses.`
-                  : "Ce graphique présente les 10 spécialités de Bac Pro qui offrent les meilleurs débouchés immédiats sur le marché du travail (taux d'emploi à 6 mois après l'obtention du diplôme)."
-                }
-              </p>
-            </div>
-            <div className="h-[500px] w-full">
+            <div className="h-[500px] w-full pt-4">
               {topFormations.length > 0 && topFormations.some(d => d.value > 0) ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={topFormations} layout="vertical" margin={{ left: 10, right: 40, bottom: 20 }}>
@@ -1097,22 +1071,62 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
             <div className="h-[300px] w-full">
               {evolutionData.length > 0 && evolutionData.some(d => d.value > 0) ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={evolutionData}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} unit="%" domain={['auto', 'auto']} />
-                    <Tooltip 
-                      contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                      formatter={(value: number) => [`${value.toFixed(1)}%`, "Taux d'emploi"]}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="value" 
-                      stroke="#8b5cf6" 
-                      strokeWidth={3} 
-                      dot={{ r: 4, fill: '#8b5cf6' }}
-                    />
-                  </LineChart>
+                  {evolutionData.filter(d => d.value > 0).length === 1 ? (
+                    <BarChart data={evolutionData}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
+                      <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} unit="%" domain={[0, 100]} />
+                      <Tooltip 
+                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                        formatter={(value: number) => [`${value.toFixed(1)}%`, "Taux d'emploi"]}
+                      />
+                      <Bar 
+                        dataKey="value" 
+                        fill="#8b5cf6" 
+                        radius={[6, 6, 0, 0]} 
+                        barSize={50} 
+                      />
+                    </BarChart>
+                  ) : (
+                    <LineChart data={evolutionData}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
+                      <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} unit="%" domain={['auto', 'auto']} />
+
+                      <ReferenceArea 
+                        x1="2019-2020" 
+                        x2="2020-2021" 
+                        {...({
+                          fill: "#f1f5f9",
+                          fillOpacity: 0.8,
+                          stroke: "#e2e8f0",
+                          strokeDasharray: "3 3"
+                        } as any)}
+                      >
+                        <Label 
+                          value="Covid + Confinement" 
+                          position="insideTop" 
+                          {...({
+                            offset: 15,
+                            fill: "#64748b",
+                            style: { fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.04em' }
+                          } as any)}
+                        />
+                      </ReferenceArea>
+
+                      <Tooltip 
+                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                        formatter={(value: number) => [`${value.toFixed(1)}%`, "Taux d'emploi"]}
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="value" 
+                        stroke="#8b5cf6" 
+                        strokeWidth={3} 
+                        dot={{ r: 4, fill: '#8b5cf6' }}
+                      />
+                    </LineChart>
+                  )}
                 </ResponsiveContainer>
               ) : (
                 <NoDataMessage />
@@ -1401,8 +1415,8 @@ function KPICard({ title, value, icon, tooltipText, color }: { title: string, va
           <div className={cn("p-2 rounded-lg shadow-xs bg-white", colors[color])}>
             {icon}
           </div>
-          <span className="text-[9px] font-black text-blue-600 bg-blue-50 border border-blue-100/50 px-1.5 py-0.5 rounded uppercase tracking-wider">
-            National
+          <span className="text-[9px] font-black text-[#E30613] bg-[#fbe6e7] border border-[#E30613]/25 px-2 py-0.5 rounded uppercase tracking-wider">
+            Données Nationales
           </span>
         </div>
         
@@ -1426,7 +1440,7 @@ function KPICard({ title, value, icon, tooltipText, color }: { title: string, va
       </div>
 
       <div>
-        <h4 className="text-slate-400 text-[10px] font-black uppercase tracking-[0.12em] mb-0.5">{title}</h4>
+        <h4 className="text-slate-400 text-[10px] font-black uppercase tracking-[0.12em] mb-0.5">{title} (Moyenne Nationale)</h4>
         <div className="text-2xl font-black text-slate-900 tracking-tighter">{value}</div>
       </div>
     </motion.div>
@@ -1450,7 +1464,7 @@ function ChartContainer({ title, icon, children, isNational = false }: { title: 
           <h3 className="text-lg font-black text-slate-900 tracking-tight">{title}</h3>
         </div>
         {isNational && (
-          <span className="text-[9px] font-black text-blue-600 bg-blue-50 border border-blue-100/50 px-2 py-0.5 rounded uppercase tracking-wider">
+          <span className="text-[9px] font-black text-[#E30613] bg-[#fbe6e7] border border-[#E30613]/25 px-2 py-0.5 rounded uppercase tracking-wider">
             Données Nationales - InserJeunes
           </span>
         )}
