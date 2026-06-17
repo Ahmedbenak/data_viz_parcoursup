@@ -68,18 +68,18 @@ function SearchableSelect({
         onFocus={() => setIsOpen(true)}
         placeholder={placeholder}
         className={cn(
-          "w-full px-4 py-3 bg-slate-50 border rounded-xl outline-none transition-all text-sm font-semibold text-slate-700",
-          disabled ? "bg-slate-100 border-slate-200 opacity-60 cursor-not-allowed" : "focus:border-[#E30613]/50 focus:bg-white focus:ring-2 focus:ring-[#E30613]/10",
-          error ? "border-red-500" : "border-slate-200"
+          "w-full text-base font-bold text-slate-900 bg-slate-50 border rounded-2xl px-6 py-4 outline-none transition-all placeholder:text-slate-400",
+          disabled ? "border-slate-100 opacity-60 cursor-not-allowed" : "border-slate-100 focus:ring-4 focus:ring-primary/10 focus:bg-white",
+          error ? "border-red-500" : ""
         )}
       />
       {isOpen && !disabled && (
-        <ul className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-auto">
+        <ul className="absolute z-20 w-full mt-2 bg-white border border-slate-100 rounded-2xl shadow-2xl max-h-60 overflow-y-auto p-2 custom-scrollbar">
           {filteredOptions.length > 0 ? (
             filteredOptions.map(opt => (
               <li 
                 key={opt} 
-                className="px-4 py-2 hover:bg-[#E30613]/5 cursor-pointer text-sm font-medium text-slate-700"
+                className="w-full text-left px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 hover:text-primary rounded-xl transition-all cursor-pointer"
                 onClick={() => {
                   onChange(opt);
                   setSearch(opt);
@@ -90,7 +90,7 @@ function SearchableSelect({
               </li>
             ))
           ) : (
-             <li className="px-4 py-2 text-sm text-slate-500 italic">Aucun résultat</li>
+             <li className="px-4 py-4 text-sm text-slate-400 italic text-center">Aucun résultat</li>
           )}
         </ul>
       )}
@@ -148,34 +148,34 @@ function MultiSearchableSelect({
           }}
           onFocus={() => setIsOpen(true)}
           placeholder={placeholder}
-          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-[#E30613]/50 focus:bg-white focus:ring-2 focus:ring-[#E30613]/10 outline-none transition-all text-sm font-semibold text-slate-700"
+          className="w-full text-base font-bold text-slate-900 bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 outline-none focus:ring-4 focus:ring-primary/10 focus:bg-white transition-all placeholder:text-slate-400"
         />
         {isOpen && (
-          <ul className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-auto">
+          <ul className="absolute z-20 w-full mt-2 bg-white border border-slate-100 rounded-2xl shadow-2xl max-h-60 overflow-y-auto p-2 custom-scrollbar">
             {filteredOptions.length > 0 ? (
               filteredOptions.map(opt => (
                 <li 
                   key={opt} 
-                  className="px-4 py-2 hover:bg-[#E30613]/5 cursor-pointer text-sm font-medium text-slate-700 flex items-center justify-between"
+                  className="w-full text-left px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 hover:text-primary rounded-xl transition-all cursor-pointer flex items-center justify-between"
                   onClick={() => toggleOption(opt)}
                 >
                   <span>{opt}</span>
                 </li>
               ))
             ) : (
-               <li className="px-4 py-2 text-sm text-slate-500 italic">Aucun résultat</li>
+               <li className="px-4 py-4 text-sm text-slate-400 italic text-center">Aucun résultat</li>
             )}
           </ul>
         )}
       </div>
 
       {selectedValues.length > 0 && (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 pt-2">
           {selectedValues.map(val => (
-             <div key={val} className="flex items-center gap-1.5 px-3 py-1.5 bg-[#E30613]/10 text-[#E30613] rounded-lg text-xs font-bold border border-[#E30613]/20">
+             <div key={val} className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary rounded-lg text-sm font-bold border border-primary/20">
                <span>{val}</span>
-               <button type="button" onClick={() => toggleOption(val)} className="hover:bg-[#E30613]/20 rounded-full p-0.5">
-                 <X className="w-3 h-3" />
+               <button type="button" onClick={() => toggleOption(val)} className="hover:bg-primary/20 rounded-full p-0.5">
+                 <X className="w-3.5 h-3.5" />
                </button>
              </div>
           ))}
@@ -287,97 +287,92 @@ export default function OnboardingQuestionnaire({
   };
 
   return (
-    <div className="min-h-screen bg-[#e8f4f8] py-8 px-4 sm:px-6 lg:px-8">
-      {/* Decorative Brand Accent (Header Block) */}
-      <div className="max-w-4xl w-full mx-auto flex flex-col md:flex-row items-center justify-between mb-8 gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-[#E30613] rounded-xl flex items-center justify-center text-white font-black shadow-md">
-            LÉ
-          </div>
-          <span className="text-xl font-display font-black text-slate-800 tracking-tight">
-            l'Étudiant <span className="text-[#E30613]">Simulateur</span>
-          </span>
-        </div>
-        {onBack && (
-          <button
+    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 sm:p-12 relative">
+      {/* Floating Back Button in Onboarding */}
+      {onBack && (
+        <div className="absolute top-8 left-8 z-[100]">
+          <button 
             onClick={onBack}
-            className="flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-slate-800 transition-colors bg-white px-4 py-2 rounded-full shadow-xs border border-slate-200"
+            className="flex items-center gap-2 px-5 py-2.5 bg-slate-900/90 backdrop-blur-sm text-white rounded-full font-bold shadow-xl hover:bg-slate-800 transition-all hover:scale-105 active:scale-95 group border border-white/20 text-sm"
           >
-            <ChevronLeft className="w-4 h-4" />
-            Retour à l'accueil
+            <ChevronLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+            <span>Retour à l'accueil</span>
           </button>
-        )}
-      </div>
-
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="max-w-4xl w-full mx-auto bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden"
-      >
-        <div className="p-8 md:p-10 border-b border-slate-100 bg-slate-50/50">
-          <h2 className="text-3xl font-black text-slate-900 tracking-tight mb-2">
-            Mon profil <span className="text-[#E30613]">Lycéen</span>
-          </h2>
-          <p className="text-slate-500 font-medium text-sm">
-            Renseigne tes spécialités, tes résultats et tes vœux pour analyser tes chances d'admission.
-          </p>
         </div>
+      )}
 
-        <form onSubmit={handleComplete} className="p-8 md:p-10 space-y-10">
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Colonne Gauche */}
-            <div className="space-y-8">
-              {/* Spécialités */}
-              <div className="space-y-5">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-[#E30613]/10 text-[#E30613] flex items-center justify-center">
-                    <BookOpen className="w-4 h-4" />
+      <div className="max-w-4xl w-full mt-12 sm:mt-0">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+          className="bg-white p-8 sm:p-16 rounded-[4.5rem] shadow-soft border border-slate-100 relative overflow-hidden"
+        >
+          {/* Decorative background elements */}
+          <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full -mr-32 -mt-32 blur-3xl" />
+          <div className="absolute bottom-0 left-0 w-64 h-64 bg-primary/5 rounded-full -ml-32 -mb-32 blur-3xl" />
+
+          <div className="mb-12 text-center relative z-10">
+            <motion.div 
+              whileHover={{ rotate: 10, scale: 1.1 }}
+              className="w-20 h-20 bg-primary-light rounded-[2rem] flex items-center justify-center mb-6 mx-auto shadow-lg shadow-primary/10"
+            >
+              <BookOpen className="w-10 h-10 text-primary" />
+            </motion.div>
+            <h2 className="text-4xl font-black text-slate-900 mb-3 tracking-tighter">Votre profil Générale / Techno</h2>
+            <p className="text-slate-500 font-medium text-lg">Renseignez vos spécialités et votre parcours pour analyser vos chances.</p>
+          </div>
+
+          <form onSubmit={handleComplete} className="space-y-8 relative z-10">
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Colonne Gauche */}
+              <div className="space-y-8">
+                {/* Spécialités */}
+                <div className="space-y-3 relative">
+                  <label className="flex items-center gap-3 text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-4">
+                    <span className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-[11px] shadow-lg shadow-primary/25 font-black">1</span>
+                    Spécialités
+                  </label>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-xs font-bold text-slate-500 mb-2">Spécialité 1</p>
+                      <SearchableSelect
+                        options={individualSpecialties}
+                        value={data.specialty1}
+                        onChange={(val) => setData({ ...data, specialty1: val })}
+                        placeholder="Rechercher une spécialité..."
+                      />
+                    </div>
+
+                    <div>
+                      <p className="text-xs font-bold text-slate-500 mb-2">Spécialité 2</p>
+                      <SearchableSelect
+                        options={validSpec2Options}
+                        value={data.specialty2}
+                        onChange={(val) => setData({ ...data, specialty2: val })}
+                        placeholder="Rechercher la 2ème spécialité..."
+                        disabled={!data.specialty1 || validSpec2Options.length === 0}
+                      />
+                      {data.specialty1 && validSpec2Options.length === 0 && (
+                        <p className="text-xs text-orange-500 mt-2 font-medium">Aucune spécialité 2 compatible en base.</p>
+                      )}
+                    </div>
                   </div>
-                  <h3 className="font-bold text-slate-900">Enseignements de spécialité</h3>
                 </div>
-                
-                <div className="space-y-4">
+
+                {/* Note au bac */}
+                <div className="space-y-3 relative">
+                  <label className="flex items-center gap-3 text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-4 mt-6">
+                    <span className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-[11px] shadow-lg shadow-primary/25 font-black">3</span>
+                    Moyenne au bac
+                  </label>
                   <div>
-                    <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-2">Spécialité 1</label>
-                    <SearchableSelect
-                      options={individualSpecialties}
-                      value={data.specialty1}
-                      onChange={(val) => setData({ ...data, specialty1: val })}
-                      placeholder="Rechercher une spécialité..."
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-2">Spécialité 2</label>
-                    <SearchableSelect
-                      options={validSpec2Options}
-                      value={data.specialty2}
-                      onChange={(val) => setData({ ...data, specialty2: val })}
-                      placeholder="Rechercher la 2ème spécialité..."
-                      disabled={!data.specialty1 || validSpec2Options.length === 0}
-                    />
-                    {data.specialty1 && validSpec2Options.length === 0 && (
-                      <p className="text-xs text-orange-500 mt-2 font-medium">Aucune spécialité 2 compatible en base.</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Note au bac */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-[#E30613]/10 text-[#E30613] flex items-center justify-center">
-                    <Calculator className="w-4 h-4" />
-                  </div>
-                  <h3 className="font-bold text-slate-900">Moyenne attendue au bac</h3>
-                </div>
-                <div>
-                  <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 px-4 py-2 rounded-xl focus-within:border-[#E30613]/50 focus-within:bg-white focus-within:ring-2 focus-within:ring-[#E30613]/10 transition-all max-w-[200px]">
                     <input
                       type="text"
                       inputMode="decimal"
-                      placeholder="14.5"
+                      placeholder="Ex: 14.5 (De 10 à 20)"
                       value={data.averageBac}
                       onChange={(e) => {
                         const value = e.target.value.replace(',', '.');
@@ -385,71 +380,83 @@ export default function OnboardingQuestionnaire({
                           setData({ ...data, averageBac: value });
                         }
                       }}
-                      className="w-full bg-transparent border-none p-0 text-xl font-black text-slate-800 placeholder:text-slate-300 focus:ring-0 outline-none text-right"
+                      className="w-full text-base font-bold text-slate-900 bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 outline-none focus:ring-4 focus:ring-primary/10 focus:bg-white transition-all placeholder:text-slate-400"
                     />
-                    <span className="text-slate-400 font-bold text-lg">/ 20</span>
+                    {data.averageBac && !isAverageValid && (
+                      <p className="text-xs text-[#E30613] mt-2 font-medium">La note doit être comprise entre 10 et 20.</p>
+                    )}
                   </div>
-                  {data.averageBac && !isAverageValid && (
-                    <p className="text-xs text-[#E30613] mt-2 font-medium">La note doit être comprise entre 10 et 20.</p>
+                </div>
+              </div>
+
+              {/* Colonne Droite */}
+              <div className="space-y-8">
+                {/* Formations visées */}
+                <div className="space-y-3 relative">
+                  <label className="flex items-center gap-3 text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-4">
+                    <span className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-[11px] shadow-lg shadow-primary/25 font-black">2</span>
+                    Filières visées
+                  </label>
+
+                  <div>
+                    <MultiSearchableSelect
+                      options={allFormationTypes}
+                      selectedValues={data.targetFormationTypes}
+                      onChange={(vals) => setData({ ...data, targetFormationTypes: vals })}
+                      placeholder="Rechercher des formations..."
+                    />
+                  </div>
+                </div>
+
+                {/* Département */}
+                <div className="space-y-3 relative">
+                  <label className="flex items-center gap-3 text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-4 mt-6">
+                    <span className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-[11px] shadow-lg shadow-primary/25 font-black">4</span>
+                    Département d'intérêt
+                  </label>
+                  <div>
+                    <SearchableSelect
+                      options={allDepartments}
+                      value={data.department}
+                      onChange={(val) => setData({ ...data, department: val })}
+                      placeholder="Rechercher un département..."
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-100 mt-8">
+              {onBack && (
+                <button
+                  type="button"
+                  onClick={onBack}
+                  className="w-full sm:w-auto px-8 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold text-sm hover:bg-slate-200 transition-colors"
+                >
+                  Retour
+                </button>
+              )}
+              <div className="flex items-center justify-end gap-4 w-full sm:w-auto ml-auto">
+                <button
+                  type="submit"
+                  disabled={!isFormValid}
+                  className={cn(
+                    "w-full sm:w-auto px-10 py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 shadow-lg transition-all",
+                    isFormValid 
+                      ? "bg-primary text-white hover:bg-primary-dark hover:-translate-y-0.5 active:translate-y-0" 
+                      : "bg-slate-100 text-slate-400 cursor-not-allowed shadow-none"
                   )}
-                </div>
+                >
+                  <span>Valider & Analyser</span>
+                  <Sparkles className="w-4 h-4 ml-1" />
+                </button>
               </div>
             </div>
 
-            {/* Colonne Droite */}
-            <div className="space-y-8">
-              {/* Formations visées */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-[#E30613]/10 text-[#E30613] flex items-center justify-center">
-                    <LayoutGrid className="w-4 h-4" />
-                  </div>
-                  <h3 className="font-bold text-slate-900">Formations visées (multiples)</h3>
-                </div>
-
-                <div className="pt-2">
-                  <MultiSearchableSelect
-                    options={allFormationTypes}
-                    selectedValues={data.targetFormationTypes}
-                    onChange={(vals) => setData({ ...data, targetFormationTypes: vals })}
-                    placeholder="Rechercher des formations..."
-                  />
-                </div>
-              </div>
-
-              {/* Département */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-[#E30613]/10 text-[#E30613] flex items-center justify-center">
-                    <MapPin className="w-4 h-4" />
-                  </div>
-                  <h3 className="font-bold text-slate-900">Département cible</h3>
-                </div>
-                <div>
-                  <SearchableSelect
-                    options={allDepartments}
-                    value={data.department}
-                    onChange={(val) => setData({ ...data, department: val })}
-                    placeholder="Rechercher un département..."
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="pt-8 border-t border-slate-100 flex justify-end">
-            <button
-              type="submit"
-              disabled={!isFormValid}
-              className="px-8 py-4 bg-[#E30613] hover:bg-[#c20511] text-white font-black text-sm uppercase tracking-wider rounded-xl transition-all duration-200 flex items-center gap-3 shadow-lg shadow-[#E30613]/25 active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <span>Analyser mon profil</span>
-              <Sparkles className="w-5 h-5" />
-            </button>
-          </div>
-
-        </form>
-      </motion.div>
+          </form>
+        </motion.div>
+      </div>
     </div>
   );
 }
