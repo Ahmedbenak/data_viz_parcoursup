@@ -287,6 +287,18 @@ export default function App() {
   const [showCitySuggestions, setShowCitySuggestions] = useState(false);
   const [allDepartments, setAllDepartments] = useState<string[]>([]);
   const [showDeptSuggestions, setShowDeptSuggestions] = useState(false);
+  const [deptSearchQuery, setDeptSearchQuery] = useState('');
+
+  const filteredDeptsList = useMemo(() => {
+    if (!deptSearchQuery) return allDepartments.slice(0, 10);
+    return allDepartments
+      .filter(d => d.toLowerCase().includes(deptSearchQuery.toLowerCase()))
+      .slice(0, 10);
+  }, [allDepartments, deptSearchQuery]);
+
+  useEffect(() => {
+    setDeptSearchQuery(geoFilter.department || '');
+  }, [geoFilter.department]);
 
   const handleReset = useCallback(() => {
     setBacType(null);
@@ -892,23 +904,72 @@ export default function App() {
               </div>
 
               {/* Department */}
-              {geoFilter.department && (
-                <div className="flex items-center gap-3 px-4 py-2 bg-white rounded-2xl border border-slate-200 shadow-sm hover:border-blue-200 transition-all">
-                  <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
-                    <MapPin className="w-4 h-4 text-blue-600" />
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Zone</span>
-                    <span className="text-sm font-bold text-blue-700">{geoFilter.department}</span>
-                  </div>
+              <div className="relative flex items-center gap-3 px-4 py-2 bg-white rounded-2xl border border-slate-200 shadow-sm hover:border-blue-200 transition-all">
+                <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center shrink-0">
+                  <MapPin className="w-4 h-4 text-blue-600" />
+                </div>
+                <div className="flex flex-col flex-1 min-w-[150px]">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Zone</span>
+                  <input
+                    type="text"
+                    value={deptSearchQuery}
+                    onChange={(e) => {
+                      setDeptSearchQuery(e.target.value);
+                      setShowDeptSuggestions(true);
+                      if (e.target.value === '') {
+                        setGeoFilter(prev => ({ ...prev, department: '' }));
+                      }
+                    }}
+                    onFocus={() => setShowDeptSuggestions(true)}
+                    placeholder="Tous les dépts..."
+                    className="w-full text-sm font-bold text-blue-700 bg-transparent border-none p-0 focus:ring-0 placeholder:text-slate-300 placeholder:font-normal truncate"
+                  />
+                </div>
+                {geoFilter.department && (
                   <button 
-                    onClick={() => setGeoFilter(prev => ({ ...prev, department: '' }))}
-                    className="ml-1 p-1 hover:bg-slate-100 rounded-full text-slate-400 transition-colors"
+                    onClick={() => {
+                      setGeoFilter(prev => ({ ...prev, department: '' }));
+                      setDeptSearchQuery('');
+                    }}
+                    className="ml-1 p-1 hover:bg-slate-100 rounded-full text-slate-400 transition-colors shrink-0"
                   >
                     <X className="w-3 h-3" />
                   </button>
-                </div>
-              )}
+                )}
+                
+                {/* Suggestions Dropdown */}
+                {showDeptSuggestions && filteredDeptsList.length > 0 && (
+                  <div className="absolute top-full left-0 mt-2 w-full min-w-[250px] z-50 bg-white rounded-xl shadow-xl border border-slate-100 max-h-60 overflow-y-auto custom-scrollbar">
+                    {filteredDeptsList.map((dept) => (
+                      <button
+                        key={dept}
+                        onClick={() => {
+                          setGeoFilter(prev => ({ ...prev, department: dept }));
+                          setDeptSearchQuery(dept);
+                          setShowDeptSuggestions(false);
+                        }}
+                        className={cn(
+                          "w-full text-left px-4 py-2 hover:bg-blue-50 transition-colors text-sm font-medium border-b border-slate-50 last:border-none",
+                          geoFilter.department === dept ? "bg-blue-50 text-blue-700" : "text-slate-700"
+                        )}
+                      >
+                        {dept}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                
+                {/* Click outside backdrop */}
+                {showDeptSuggestions && (
+                  <div 
+                    className="fixed inset-0 z-40" 
+                    onClick={() => {
+                      setShowDeptSuggestions(false);
+                      setDeptSearchQuery(geoFilter.department || '');
+                    }}
+                  />
+                )}
+              </div>
 
               {(filterAverage !== onboardingData?.averageBac || geoFilter.department !== (onboardingData?.department || '')) && (
                 <button 
