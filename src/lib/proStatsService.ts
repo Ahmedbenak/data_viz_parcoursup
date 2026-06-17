@@ -3,9 +3,9 @@
 //
 // Service d'accès aux statistiques Bac Pro pré-agrégées.
 // Toutes les fonctions retournent des objets typés et lisent UNE OU QUELQUES
-// LIGNES seulement dans `parcoursup_pro_stats_aggregated`.
+// LIGNES seulement dans `inserjeunes_stats_aggregated`.
 //
-// Remplace les requêtes massives sur `parcoursup_fine_clean` qui chargeaient
+// Remplace les requêtes massives sur `inserjeunes_brut` qui chargeaient
 // des milliers de lignes pour faire des AVG côté client.
 // =============================================================================
 
@@ -53,7 +53,7 @@ export interface TopFormation {
 
 // ---------- Constantes ------------------------------------------------------
 
-const TABLE = 'parcoursup_pro_stats_aggregated';
+const TABLE = 'inserjeunes_stats_aggregated';
 
 /** Année par défaut pour les KPI et les graphiques cumulés. */
 export const CURRENT_CUMUL = 'cumul 2023-2024';

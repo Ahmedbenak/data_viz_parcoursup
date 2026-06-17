@@ -1,15 +1,13 @@
-import React, { useState, useMemo } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { motion } from 'motion/react';
 import { 
+  Calculator,
   Check, 
-  ChevronRight, 
-  ChevronLeft,
-  Search,
-  GraduationCap,
   MapPin,
-  TrendingUp,
-  LayoutGrid,
-  Sparkles
+  Sparkles,
+  BookOpen,
+  ChevronLeft,
+  LayoutGrid
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -41,12 +39,11 @@ export default function OnboardingQuestionnaire({
   onComplete, 
   specialties, 
   individualSpecialties, 
-  loadingSpecialties, 
   allFormationTypes,
   allDepartments,
+  loadingSpecialties,
   onBack
 }: OnboardingProps) {
-  const [step, setStep] = useState<number>(1);
   const [data, setData] = useState<OnboardingData>({
     specialty1: '',
     specialty2: '',
@@ -55,34 +52,26 @@ export default function OnboardingQuestionnaire({
     targetFormationTypes: [],
     department: ''
   });
-  const [search1, setSearch1] = useState('');
-  const [search2, setSearch2] = useState('');
-  const [deptSearch, setDeptSearch] = useState('');
 
-  // Filtering lists
-  const filtered1 = useMemo(() => {
-    return individualSpecialties.filter(s => 
-      s.toLowerCase().includes(search1.toLowerCase())
-    );
-  }, [individualSpecialties, search1]);
-
-  // For specialty 2, we must ensure it's not specialty 1, and that there is a valid combination in specialties database
-  const filtered2 = useMemo(() => {
+  // Derived combo compatibility (only allow specialty 2 if it forms a valid combo with specialty 1)
+  const validSpec2Options = useMemo(() => {
+    if (!data.specialty1) return individualSpecialties; // show all if spec1 not selected
+    
     return individualSpecialties.filter(s => {
       if (s === data.specialty1) return false;
-      if (!s.toLowerCase().includes(search2.toLowerCase())) return false;
-      // Ensure the combination [specialty1, s] exists somewhere in our specialties array
-      return specialties.some(comb => 
-        comb.includes(data.specialty1) && comb.includes(s)
-      );
+      return specialties.some(comb => comb.includes(data.specialty1) && comb.includes(s));
     });
-  }, [individualSpecialties, data.specialty1, search2, specialties]);
+  }, [data.specialty1, individualSpecialties, specialties]);
 
-  const filteredDepts = useMemo(() => {
-    return allDepartments.filter(d => 
-      d.toLowerCase().includes(deptSearch.toLowerCase())
-    ).slice(0, 12);
-  }, [allDepartments, deptSearch]);
+  // If specialty1 changes, ensure specialty2 is still valid. If not, reset it.
+  useEffect(() => {
+    if (data.specialty1 && data.specialty2) {
+      const stillValid = validSpec2Options.includes(data.specialty2);
+      if (!stillValid) {
+        setData(prev => ({ ...prev, specialty2: '' }));
+      }
+    }
+  }, [data.specialty1, validSpec2Options, data.specialty2]);
 
   const isValidCombination = useMemo(() => {
     if (!data.specialty1 || !data.specialty2) return false;
@@ -91,41 +80,17 @@ export default function OnboardingQuestionnaire({
     );
   }, [data.specialty1, data.specialty2, specialties]);
 
-  const handleAverageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(',', '.');
-    if (value === '' || /^\d*\.?\d*$/.test(value)) {
-      setData({ ...data, averageBac: value });
-    }
-  };
-
   const isAverageValid = useMemo(() => {
     if (!data.averageBac) return false;
     const val = parseFloat(data.averageBac);
     return !isNaN(val) && val >= 10 && val <= 20;
   }, [data.averageBac]);
 
-  const handleNextStep = () => {
-    if (step === 1 && data.specialty1) {
-      setStep(2);
-    } else if (step === 2 && data.specialty2 && isValidCombination) {
-      setStep(3);
-    } else if (step === 3 && isAverageValid) {
-      setStep(4);
-    } else if (step === 4 && data.targetFormationTypes.length > 0) {
-      setStep(5);
-    }
-  };
+  const isFormValid = !!data.specialty1 && !!data.specialty2 && isValidCombination && isAverageValid && data.targetFormationTypes.length > 0 && !!data.department;
 
-  const handlePrevStep = () => {
-    if (step > 1) {
-      setStep(step - 1);
-    } else if (onBack) {
-      onBack();
-    }
-  };
-
-  const handleComplete = () => {
-    if (!isAverageValid || !data.department) return;
+  const handleComplete = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isFormValid) return;
     
     // Find the actual string in the database that contains both
     const actualSpecialty = specialties.find(s => 
@@ -140,13 +105,22 @@ export default function OnboardingQuestionnaire({
     });
   };
 
-  // Progress percentage
-  const progressPercent = (step / 5) * 100;
+  const toggleFormation = (type: string) => {
+    setData((prev) => {
+      const isSelected = prev.targetFormationTypes.includes(type);
+      return {
+        ...prev,
+        targetFormationTypes: isSelected 
+          ? prev.targetFormationTypes.filter(t => t !== type)
+          : [...prev.targetFormationTypes, type]
+      };
+    });
+  };
 
   return (
-    <div className="min-h-screen bg-[#e8f4f8] flex flex-col justify-between py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[#e8f4f8] py-8 px-4 sm:px-6 lg:px-8">
       {/* Decorative Brand Accent (Header Block) */}
-      <div className="max-w-4xl w-full mx-auto flex items-center justify-between no-print mb-8">
+      <div className="max-w-4xl w-full mx-auto flex flex-col md:flex-row items-center justify-between mb-8 gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-[#E30613] rounded-xl flex items-center justify-center text-white font-black shadow-md">
             LÉ
@@ -155,347 +129,191 @@ export default function OnboardingQuestionnaire({
             l'Étudiant <span className="text-[#E30613]">Simulateur</span>
           </span>
         </div>
-        <div className="bg-white/85 backdrop-blur-xs border border-slate-200/50 rounded-full px-4 py-1.5 text-[11px] font-black text-slate-600 uppercase tracking-widest shadow-xs">
-          Parcoursup 2026
-        </div>
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-slate-800 transition-colors bg-white px-4 py-2 rounded-full shadow-xs border border-slate-200"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            Retour à l'accueil
+          </button>
+        )}
       </div>
 
-      <div className="max-w-3xl w-full mx-auto flex-1 flex flex-col justify-center">
-        {/* Step Indicator Section */}
-        <div className="mb-6 mx-auto w-full max-w-xl text-center">
-          <div className="flex items-center justify-between mb-2 text-xs font-black text-slate-500 uppercase tracking-widest px-1">
-            <span>Étape {step} sur 5</span>
-            <span className="text-[#E30613]">{Math.round(progressPercent)}% complété</span>
-          </div>
-          {/* Progress bar */}
-          <div className="h-1.5 w-full bg-slate-200/60 rounded-full overflow-hidden p-[1px]">
-            <motion.div 
-              className="h-full bg-[#E30613] rounded-full"
-              initial={{ width: '20%' }}
-              animate={{ width: `${progressPercent}%` }}
-              transition={{ duration: 0.3 }}
-            />
-          </div>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="max-w-4xl w-full mx-auto bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden"
+      >
+        <div className="p-8 md:p-10 border-b border-slate-100 bg-slate-50/50">
+          <h2 className="text-3xl font-black text-slate-900 tracking-tight mb-2">
+            Mon profil <span className="text-[#E30613]">Lycéen</span>
+          </h2>
+          <p className="text-slate-500 font-medium text-sm">
+            Renseigne tes spécialités, tes résultats et tes vœux pour analyser tes chances d'admission.
+          </p>
         </div>
 
-        {/* Wizard Main Card */}
-        <motion.div
-          key={step}
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -20 }}
-          transition={{ duration: 0.3 }}
-          className="bg-white p-8 md:p-12 rounded-3xl shadow-soft border border-slate-100 flex flex-col justify-between relative min-h-[500px]"
-        >
-          {/* Step Contents */}
-          <div className="flex-1">
-            {/* STEP 1: First Specialty */}
-            {step === 1 && (
-              <div className="space-y-6">
-                <div className="text-center max-w-xl mx-auto mb-8">
-                  <span className="text-[10px] font-black text-[#E30613] uppercase tracking-[0.2em] bg-[#fbe6e7] px-3 py-1 rounded-full">Spécialité 1</span>
-                  <h3 className="text-3xl md:text-4xl font-extrabold text-slate-900 mt-3 tracking-tight">
-                    Ta <span className="text-[#E30613]">première spécialité</span>
-                  </h3>
-                  <p className="text-slate-500 font-medium text-sm mt-2">
-                    Choisis l'un de tes deux enseignements de spécialité.
-                  </p>
+        <form onSubmit={handleComplete} className="p-8 md:p-10 space-y-10">
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Colonne Gauche */}
+            <div className="space-y-8">
+              {/* Spécialités */}
+              <div className="space-y-5">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-[#E30613]/10 text-[#E30613] flex items-center justify-center">
+                    <BookOpen className="w-4 h-4" />
+                  </div>
+                  <h3 className="font-bold text-slate-900">Enseignements de spécialité</h3>
                 </div>
-
-                <div className="relative max-w-md mx-auto mb-6">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                  <input 
-                    type="text"
-                    placeholder="Rechercher une spécialité..."
-                    value={search1}
-                    onChange={(e) => setSearch1(e.target.value)}
-                    className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 focus:border-[#E30613]/30 focus:bg-white rounded-xl transition-all text-sm font-bold outline-none shadow-xs"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[250px] overflow-y-auto p-1 custom-scrollbar">
-                  {filtered1.map((spec) => {
-                    const isSelected = data.specialty1 === spec;
-                    return (
-                      <button
-                        key={spec}
-                        onClick={() => {
-                          setData({ ...data, specialty1: spec });
-                          // Force clear specialty2 if it was selected and becomes identical
-                          if (data.specialty2 === spec) {
-                            setData(prev => ({ ...prev, specialty1: spec, specialty2: '' }));
-                          }
-                          // Smooth auto-advance helper
-                          setTimeout(() => {
-                            setStep(2);
-                          }, 250);
-                        }}
-                        className={cn(
-                          "px-5 py-3.5 rounded-xl border text-xs font-bold transition-all text-left flex items-center justify-between",
-                          isSelected 
-                            ? "bg-[#E30613] border-[#E30613] text-white shadow-md shadow-[#E30613]/25" 
-                            : "bg-white border-slate-200 text-slate-700 hover:border-[#E30613]/30 hover:bg-slate-50/50"
-                        )}
-                      >
-                        <span className="line-clamp-1">{spec}</span>
-                        {isSelected && <Check className="w-4 h-4 flex-shrink-0" />}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* STEP 2: Second Specialty */}
-            {step === 2 && (
-              <div className="space-y-6">
-                <div className="text-center max-w-xl mx-auto mb-8">
-                  <span className="text-[10px] font-black text-[#E30613] uppercase tracking-[0.2em] bg-[#fbe6e7] px-3 py-1 rounded-full">Spécialité 2</span>
-                  <h3 className="text-3xl md:text-4xl font-extrabold text-slate-900 mt-3 tracking-tight">
-                    Ta <span className="text-[#E30613]">deuxième spécialité</span>
-                  </h3>
-                  <p className="text-slate-500 font-medium text-sm mt-3">
-                    Choisis ton autre enseignement de spécialité (associé avec <strong className="text-slate-800">{data.specialty1}</strong>).
-                  </p>
-                </div>
-
-                <div className="relative max-w-md mx-auto mb-6">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                  <input 
-                    type="text"
-                    placeholder="Rechercher ta seconde spécialité..."
-                    value={search2}
-                    onChange={(e) => setSearch2(e.target.value)}
-                    className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 focus:border-[#E30613]/30 focus:bg-white rounded-xl transition-all text-sm font-bold outline-none shadow-xs"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[250px] overflow-y-auto p-1 custom-scrollbar">
-                  {filtered2.length > 0 ? (
-                    filtered2.map((spec) => {
-                      const isSelected = data.specialty2 === spec;
-                      return (
-                        <button
-                          key={spec}
-                          onClick={() => {
-                            setData({ ...data, specialty2: spec });
-                            setTimeout(() => {
-                              setStep(3);
-                            }, 250);
-                          }}
-                          className={cn(
-                            "px-5 py-3.5 rounded-xl border text-xs font-bold transition-all text-left flex items-center justify-between",
-                            isSelected 
-                              ? "bg-[#E30613] border-[#E30613] text-white shadow-md shadow-[#E30613]/25" 
-                              : "bg-white border-slate-200 text-slate-700 hover:border-[#E30613]/30 hover:bg-slate-50/50"
-                          )}
-                        >
-                          <span className="line-clamp-1">{spec}</span>
-                          {isSelected && <Check className="w-4 h-4 flex-shrink-0" />}
-                        </button>
-                      );
-                    })
-                  ) : (
-                    <div className="col-span-2 text-center py-6 text-xs text-slate-400 italic">
-                      Aucune spécialité compatible trouvée pour cette recherche ou cette combinaison.
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* STEP 3: Average Bac */}
-            {step === 3 && (
-              <div className="space-y-6">
-                <div className="text-center max-w-xl mx-auto mb-10">
-                  <span className="text-[10px] font-black text-[#E30613] uppercase tracking-[0.2em] bg-[#fbe6e7] px-3 py-1 rounded-full">Potentiel</span>
-                  <h3 className="text-3xl md:text-4xl font-extrabold text-slate-900 mt-3 tracking-tight">
-                    <span className="text-[#E30613]">Moyenne attendue</span> au bac
-                  </h3>
-                  <p className="text-slate-500 font-medium text-sm mt-3">
-                    Saisis ta moyenne attendue sur 20.
-                  </p>
-                </div>
-
-                <div className="flex flex-col items-center justify-center py-6">
-                  <div className="flex items-center gap-4 bg-slate-50 hover:bg-slate-100/50 border border-slate-200 px-8 py-5 rounded-2xl relative transition-all group max-w-xs justify-center mx-auto shadow-xs">
-                    <input 
-                      type="text" 
-                      inputMode="decimal"
-                      placeholder="14.5"
-                      autoFocus
-                      value={data.averageBac}
-                      onChange={handleAverageChange}
-                      className={cn(
-                        "w-24 bg-transparent border-none p-0 text-center text-4xl font-black focus:ring-0 outline-none",
-                        data.averageBac && !isAverageValid ? "text-[#E30613]" : "text-slate-900 placeholder:text-slate-200"
-                      )}
-                    />
-                    <span className="text-slate-300 font-black text-2xl">/ 20</span>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-2">Spécialité 1</label>
+                    <select
+                      value={data.specialty1}
+                      onChange={(e) => setData({ ...data, specialty1: e.target.value })}
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-[#E30613]/50 focus:bg-white focus:ring-2 focus:ring-[#E30613]/10 outline-none transition-all text-sm font-semibold text-slate-700 appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E')] bg-[length:1em_1em] bg-[right_1rem_center] bg-no-repeat"
+                    >
+                      <option value="">Sélectionner une spécialité...</option>
+                      {individualSpecialties.map(spec => (
+                        <option key={spec} value={spec}>{spec}</option>
+                      ))}
+                    </select>
                   </div>
 
-                  {data.averageBac && !isAverageValid && (
-                    <motion.div 
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="mt-4 flex items-center gap-2 text-[#E30613] text-[11px] font-black uppercase tracking-wider"
+                  <div>
+                    <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-2">Spécialité 2</label>
+                    <select
+                      value={data.specialty2}
+                      onChange={(e) => setData({ ...data, specialty2: e.target.value })}
+                      disabled={!data.specialty1 || validSpec2Options.length === 0}
+                      className={cn(
+                        "w-full px-4 py-3 border rounded-xl outline-none transition-all text-sm font-semibold text-slate-700 appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E')] bg-[length:1em_1em] bg-[right_1rem_center] bg-no-repeat",
+                        (!data.specialty1 || validSpec2Options.length === 0)
+                          ? "bg-slate-100 border-slate-200 opacity-60 cursor-not-allowed"
+                          : "bg-slate-50 border-slate-200 focus:border-[#E30613]/50 focus:bg-white focus:ring-2 focus:ring-[#E30613]/10"
+                      )}
                     >
-                      <div className="w-1.5 h-1.5 rounded-full bg-[#E30613] animate-pulse" />
-                      <span>La note doit être comprise entre 10.00 et 20.00</span>
-                    </motion.div>
+                      <option value="">Sélectionner la 2ème spécialité...</option>
+                      {validSpec2Options.map(spec => (
+                        <option key={spec} value={spec}>{spec}</option>
+                      ))}
+                    </select>
+                    {data.specialty1 && validSpec2Options.length === 0 && (
+                      <p className="text-xs text-orange-500 mt-2 font-medium">Aucune spécialité 2 compatible en base.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Note au bac */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-[#E30613]/10 text-[#E30613] flex items-center justify-center">
+                    <Calculator className="w-4 h-4" />
+                  </div>
+                  <h3 className="font-bold text-slate-900">Moyenne attendue au bac</h3>
+                </div>
+                <div>
+                  <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 px-4 py-2 rounded-xl focus-within:border-[#E30613]/50 focus-within:bg-white focus-within:ring-2 focus-within:ring-[#E30613]/10 transition-all max-w-[200px]">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="14.5"
+                      value={data.averageBac}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(',', '.');
+                        if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                          setData({ ...data, averageBac: value });
+                        }
+                      }}
+                      className="w-full bg-transparent border-none p-0 text-xl font-black text-slate-800 placeholder:text-slate-300 focus:ring-0 outline-none text-right"
+                    />
+                    <span className="text-slate-400 font-bold text-lg">/ 20</span>
+                  </div>
+                  {data.averageBac && !isAverageValid && (
+                    <p className="text-xs text-[#E30613] mt-2 font-medium">La note doit être comprise entre 10 et 20.</p>
                   )}
                 </div>
               </div>
-            )}
 
-            {/* STEP 4: Target Formations */}
-            {step === 4 && (
-              <div className="space-y-6">
-                <div className="text-center max-w-xl mx-auto mb-6">
-                  <span className="text-[10px] font-black text-[#E30613] uppercase tracking-[0.2em] bg-[#fbe6e7] px-3 py-1 rounded-full">Préférences</span>
-                  <h3 className="text-3xl md:text-4xl font-extrabold text-slate-900 mt-3 tracking-tight">
-                    <span className="text-[#E30613]">Formations</span> visées
-                  </h3>
-                  <p className="text-slate-500 font-medium text-sm mt-3">
-                    Sélectionne un ou plusieurs types de formations.
-                  </p>
+              {/* Département */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-[#E30613]/10 text-[#E30613] flex items-center justify-center">
+                    <MapPin className="w-4 h-4" />
+                  </div>
+                  <h3 className="font-bold text-slate-900">Département cible</h3>
                 </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[280px] overflow-y-auto p-1 custom-scrollbar">
-                  {allFormationTypes.map((type, i) => {
-                    const isSelected = data.targetFormationTypes.includes(type);
-                    return (
-                      <button
-                        key={i}
-                        onClick={() => {
-                          setData(prev => ({
-                            ...prev,
-                            targetFormationTypes: isSelected 
-                              ? prev.targetFormationTypes.filter(t => t !== type)
-                              : [...prev.targetFormationTypes, type]
-                          }));
-                        }}
-                        className={cn(
-                          "p-4 rounded-xl border text-xs font-bold transition-all text-left flex items-start gap-3 relative overflow-hidden group",
-                          isSelected 
-                            ? "bg-[#E30613]/5 border-[#E30613] text-slate-900 shadow-xs" 
-                            : "bg-white border-slate-200 text-slate-700 hover:border-[#E30613]/25 hover:bg-slate-50/30"
-                        )}
-                      >
-                        <div className={cn(
-                          "w-5 h-5 rounded-md flex items-center justify-center shrink-0 border mt-0.5",
-                          isSelected ? "bg-[#E30613] border-[#E30613] text-white" : "bg-slate-50 border-slate-300"
-                        )}>
-                          {isSelected && <Check className="w-3.5 h-3.5" />}
-                        </div>
-                        <span className="leading-snug">{type}</span>
-                      </button>
-                    );
-                  })}
+                <div>
+                  <select
+                    value={data.department}
+                    onChange={(e) => setData({ ...data, department: e.target.value })}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-[#E30613]/50 focus:bg-white focus:ring-2 focus:ring-[#E30613]/10 outline-none transition-all text-sm font-semibold text-slate-700 appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E')] bg-[length:1em_1em] bg-[right_1rem_center] bg-no-repeat"
+                  >
+                    <option value="">Sélectionner un département...</option>
+                    {allDepartments.map(dept => (
+                      <option key={dept} value={dept}>{dept}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
-            )}
+            </div>
 
-            {/* STEP 5: Home Department */}
-            {step === 5 && (
-              <div className="space-y-6">
-                <div className="text-center max-w-xl mx-auto mb-6">
-                  <span className="text-[10px] font-black text-[#E30613] uppercase tracking-[0.2em] bg-[#fbe6e7] px-3 py-1 rounded-full">Localisation</span>
-                  <h3 className="text-3xl md:text-4xl font-extrabold text-slate-900 mt-3 tracking-tight">
-                    Ton <span className="text-[#E30613]">département</span>
-                  </h3>
-                  <p className="text-slate-500 font-medium text-sm mt-3">
-                    Il servira à localiser tes recherches.
-                  </p>
+            {/* Colonne Droite */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-[#E30613]/10 text-[#E30613] flex items-center justify-center">
+                  <LayoutGrid className="w-4 h-4" />
                 </div>
-
-                <div className="relative max-w-md mx-auto mb-6">
-                  <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                  <input 
-                    type="text"
-                    placeholder="Saisis ton département ou numéro..."
-                    value={deptSearch}
-                    onChange={(e) => {
-                      setDeptSearch(e.target.value);
-                    }}
-                    className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 focus:border-[#E30613]/30 focus:bg-white rounded-xl transition-all text-sm font-bold outline-none shadow-xs"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[220px] overflow-y-auto p-1 custom-scrollbar">
-                  {filteredDepts.length > 0 ? (
-                    filteredDepts.map((dept, i) => {
-                      const isSelected = data.department === dept;
-                      return (
-                        <button
-                          key={i}
-                          onClick={() => {
-                            setData({ ...data, department: dept });
-                            setDeptSearch(dept);
-                          }}
-                          className={cn(
-                            "px-4 py-3 rounded-lg border text-xs font-bold transition-all text-center leading-tight truncate",
-                            isSelected 
-                              ? "bg-[#E30613] border-[#E30613] text-white shadow-xs" 
-                              : "bg-white border-slate-200 text-slate-700 hover:border-[#E30613]/30 hover:bg-slate-50/50"
-                          )}
-                        >
-                          {dept}
-                        </button>
-                      );
-                    })
-                  ) : (
-                    <div className="col-span-3 text-center py-6 text-xs text-slate-400 italic">
-                      Aucun département ne correspond.
-                    </div>
-                  )}
-                </div>
+                <h3 className="font-bold text-slate-900">Formations visées (multiples)</h3>
               </div>
-            )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {allFormationTypes.map((type) => {
+                  const isSelected = data.targetFormationTypes.includes(type);
+                  return (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => toggleFormation(type)}
+                      className={cn(
+                        "p-3 rounded-xl border text-xs font-bold transition-all text-left flex items-start gap-3 relative overflow-hidden group",
+                        isSelected 
+                          ? "bg-[#E30613]/5 border-[#E30613] text-slate-900 shadow-xs" 
+                          : "bg-white border-slate-200 text-slate-600 hover:border-[#E30613]/30"
+                      )}
+                    >
+                      <div className={cn(
+                        "w-5 h-5 rounded-md flex flex-shrink-0 items-center justify-center border mt-0.5",
+                        isSelected ? "bg-[#E30613] border-[#E30613] text-white" : "bg-slate-50 border-slate-300"
+                      )}>
+                        {isSelected && <Check className="w-3.5 h-3.5" />}
+                      </div>
+                      <span className="leading-snug">{type}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
 
-          {/* Massive CTA Buttons Row */}
-          <div className="mt-8 pt-6 border-t border-slate-100 flex items-center justify-between gap-4">
+          <div className="pt-8 border-t border-slate-100 flex justify-end">
             <button
-              onClick={handlePrevStep}
-              className="px-6 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-sm rounded-xl transition-all duration-200 flex items-center gap-2"
+              type="submit"
+              disabled={!isFormValid}
+              className="px-8 py-4 bg-[#E30613] hover:bg-[#c20511] text-white font-black text-sm uppercase tracking-wider rounded-xl transition-all duration-200 flex items-center gap-3 shadow-lg shadow-[#E30613]/25 active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <ChevronLeft className="w-4 h-4" />
-              <span>Retour</span>
+              <span>Analyser mon profil</span>
+              <Sparkles className="w-5 h-5" />
             </button>
-
-            {step < 5 ? (
-              <button
-                onClick={handleNextStep}
-                disabled={
-                  (step === 1 && !data.specialty1) ||
-                  (step === 2 && (!data.specialty2 || !isValidCombination)) ||
-                  (step === 3 && !isAverageValid) ||
-                  (step === 4 && data.targetFormationTypes.length === 0)
-                }
-                className="px-8 py-3.5 bg-slate-900 border border-slate-900 hover:bg-slate-800 text-white font-black text-sm uppercase tracking-wider rounded-xl transition-all duration-200 flex items-center gap-2 shadow-lg shadow-slate-900/10 active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <span>Continuer</span>
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            ) : (
-              <button
-                onClick={handleComplete}
-                disabled={!data.department || !isAverageValid || !isValidCombination}
-                className="px-8 py-3.5 bg-slate-900 border border-[#E30613] hover:bg-slate-800 text-white font-black text-sm uppercase tracking-wider rounded-xl transition-all duration-200 flex items-center gap-2 shadow-lg shadow-[#E30613]/10 active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed animate-pulse"
-              >
-                <span>Analyser mon profil</span>
-                <Sparkles className="w-4 h-4 text-[#E30613]" />
-              </button>
-            )}
           </div>
-        </motion.div>
-      </div>
 
-      {/* Footer Line */}
-      <div className="text-center text-[10px] font-black text-slate-400 uppercase tracking-widest mt-8">
-        Simulateur d'Orientation l'Étudiant • Données Nationales sous Licence Ouverte
-      </div>
+        </form>
+      </motion.div>
     </div>
   );
 }
+

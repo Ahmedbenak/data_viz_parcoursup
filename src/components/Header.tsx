@@ -62,6 +62,15 @@ export default function Header({ onboardingData, setOnboardingComplete, onHome }
             
             {/* Actions Droite */}
             <div className="flex items-center gap-5">
+              <button className="text-white hover:text-white/80 transition-colors">
+                <Bell className="w-5 h-5 sm:w-6 sm:h-6" />
+              </button>
+              <button className="text-white hover:text-white/80 transition-colors">
+                <Search className="w-5 h-5 sm:w-6 sm:h-6" />
+              </button>
+
+              <div className="hidden sm:block w-px h-6 bg-white/30"></div> {/* Séparateur vertical */}
+
               {/* Vos données onboarding (conservées) */}
               {onboardingData && (
                 <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-white/20 rounded-full border border-white/30 backdrop-blur-sm">
@@ -82,6 +91,33 @@ export default function Header({ onboardingData, setOnboardingComplete, onHome }
               </button>
             </div>
           </div>
+
+          {/* --- LIGNE BAS : Navigation --- */}
+          <nav className="flex items-center gap-6 pb-3 overflow-x-auto no-scrollbar">
+            <a href="#" className="text-white font-bold text-[14px] sm:text-[15px] hover:underline whitespace-nowrap">Salons</a>
+            
+            <button className="flex items-center gap-1 text-white font-bold text-[14px] sm:text-[15px] hover:underline whitespace-nowrap">
+              Orientation <ChevronDown className="w-4 h-4" />
+            </button>
+            
+            <button className="flex items-center gap-1 text-white font-bold text-[14px] sm:text-[15px] hover:underline whitespace-nowrap">
+              Révisions / Examens <ChevronDown className="w-4 h-4" />
+            </button>
+            
+            <button className="flex items-center gap-1 text-white font-bold text-[14px] sm:text-[15px] hover:underline whitespace-nowrap">
+              Métiers <ChevronDown className="w-4 h-4" />
+            </button>
+            
+            <button className="flex items-center gap-1 text-white font-bold text-[14px] sm:text-[15px] hover:underline whitespace-nowrap">
+              Vie étudiante <ChevronDown className="w-4 h-4" />
+            </button>
+            
+            <button className="flex items-center gap-1 text-white font-bold text-[14px] sm:text-[15px] hover:underline whitespace-nowrap">
+              Jobs, stages, alternance <ChevronDown className="w-4 h-4" />
+            </button>
+            
+            <a href="#" className="text-white font-bold text-[14px] sm:text-[15px] hover:underline whitespace-nowrap">EducPros</a>
+          </nav>
         </div>
 
         {/* --- LIGNE MULTICOLORE (Design signature l'Étudiant) --- */}
