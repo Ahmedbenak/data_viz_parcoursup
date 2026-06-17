@@ -555,6 +555,20 @@ export default function App() {
     loadSpecialtyData();
   }, [selectedSpecialty]);
 
+  // Load saved general onboarding from sessionStorage if exists
+  useEffect(() => {
+    const saved = sessionStorage.getItem('parcoursup_general_onboarding');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed) {
+          handleOnboardingComplete(parsed);
+          setBacType('general');
+        }
+      } catch(e) {}
+    }
+  }, []);
+
   const handleOnboardingComplete = (data: OnboardingData) => {
     setOnboardingData(data);
     if (data.specialty) {
@@ -572,6 +586,7 @@ export default function App() {
         : prev.formationTypes
     }));
     
+    sessionStorage.setItem('parcoursup_general_onboarding', JSON.stringify(data));
     setOnboardingComplete(true);
   };
 

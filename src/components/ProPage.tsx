@@ -230,9 +230,9 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
   const [showQBacProSuggestions, setShowQBacProSuggestions] = useState(false);
   const [showQDeptSuggestions, setShowQDeptSuggestions] = useState(false);
 
-  // Load saved onboarding from localStorage if exists
+  // Load saved onboarding from sessionStorage if exists
   useEffect(() => {
-    const saved = localStorage.getItem('parcoursup_pro_onboarding');
+    const saved = sessionStorage.getItem('parcoursup_pro_onboarding');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -823,7 +823,7 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
                   <button
                     disabled={!isQFormValid}
                     onClick={() => {
-                      localStorage.setItem('parcoursup_pro_onboarding', JSON.stringify(proOnboardingData));
+                      sessionStorage.setItem('parcoursup_pro_onboarding', JSON.stringify(proOnboardingData));
                       setSelectedBacPro(proOnboardingData.bacPro);
                       setProUserNote(proOnboardingData.averageBac);
                       setGeoFilter(prev => ({
