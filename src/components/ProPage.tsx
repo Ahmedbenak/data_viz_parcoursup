@@ -197,6 +197,7 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
   const [allCities, setAllCities] = useState<string[]>([]);
   const [allDepartments, setAllDepartments] = useState<string[]>([]);
   const [allFormationTypes, setAllFormationTypes] = useState<string[]>([]);
+  const [formationHierarchy, setFormationHierarchy] = useState<Record<string, string[]>>({});
   const [showCitySuggestions, setShowCitySuggestions] = useState(false);
   const [showDeptSuggestions, setShowDeptSuggestions] = useState(false);
   const [showFormationSuggestions, setShowFormationSuggestions] = useState(false);
@@ -207,7 +208,8 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
     radius: 1000,
     city: '',
     department: onboardingData?.department || '',
-    formationTypes: onboardingData?.targetFormationTypes || [] as string[]
+    formationTypes: onboardingData?.targetFormationTypes || [] as string[],
+    subFormationTypes: onboardingData?.targetSubFormationTypes || [] as string[]
   });
 
   // Questionnaire states
@@ -216,11 +218,13 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
   const [proOnboardingData, setProOnboardingData] = useState<{
     bacPro: string;
     targetFormation: string;
+    targetSubFormation?: string;
     averageBac: string;
     department: string;
   }>({
     bacPro: '',
     targetFormation: '',
+    targetSubFormation: '',
     averageBac: '',
     department: ''
   });
@@ -246,7 +250,8 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
         setGeoFilter(prev => ({
           ...prev,
           department: parsed.department,
-          formationTypes: parsed.targetFormation ? [parsed.targetFormation] : prev.formationTypes
+          formationTypes: parsed.targetFormation ? [parsed.targetFormation] : prev.formationTypes,
+          subFormationTypes: parsed.targetSubFormation ? [parsed.targetSubFormation] : prev.subFormationTypes
         }));
         setShowProOnboarding(false);
       } catch (e) {
@@ -320,6 +325,46 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
         if (deptResult.data) setAllDepartments(deptResult.data.map((r: any) => r.dept));
         if (typeResult.data) setAllFormationTypes(typeResult.data.map((r: any) => r.filiere));
         if (bacProListData) setAllBacPros(bacProListData);
+
+        // Fetch hierarchy for sub-formations
+        let hasMoreHierarchy = true;
+        let hierarchyFrom = 0;
+        let rawHierarchy: { filiere_generale: string; filiere_detaillee_bis: string }[] = [];
+        while (hasMoreHierarchy) {
+          const { data: hData, error: hError } = await supabase
+            .from('parcoursup_2')
+            .select('filiere_generale, filiere_detaillee_bis')
+            .range(hierarchyFrom, hierarchyFrom + 999);
+          
+          if (hError) {
+            console.error('Error loading hierarchy:', hError);
+            break;
+          }
+          
+          if (hData && hData.length > 0) {
+            rawHierarchy = [...rawHierarchy, ...hData];
+            hierarchyFrom += 1000;
+            if (hData.length < 1000) hasMoreHierarchy = false;
+          } else {
+            hasMoreHierarchy = false;
+          }
+        }
+
+        const newHierarchy: Record<string, Set<string>> = {};
+        rawHierarchy.forEach(row => {
+          if (row.filiere_generale && row.filiere_detaillee_bis) {
+            if (!newHierarchy[row.filiere_generale]) {
+              newHierarchy[row.filiere_generale] = new Set();
+            }
+            newHierarchy[row.filiere_generale].add(row.filiere_detaillee_bis);
+          }
+        });
+        
+        const formattedHierarchy: Record<string, string[]> = {};
+        for (const key in newHierarchy) {
+          formattedHierarchy[key] = Array.from(newHierarchy[key]).sort();
+        }
+        setFormationHierarchy(formattedHierarchy);
 
       } catch (err: any) {
         console.error('Error fetching Pro page metadata:', err);
@@ -415,11 +460,6 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
   // Reactive Map Data Fetching (Identical to General section)
   useEffect(() => {
     const loadMapData = async () => {
-      if (geoFilter.formationTypes.length === 0) {
-        setMapData([]);
-        return;
-      }
-      
       try {
         const supabase = getSupabase();
         let allP2Data: any[] = [];
@@ -428,15 +468,24 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
         let hasMore = true;
 
         while (hasMore) {
-          const { data, error } = await supabase
+          let query = supabase
             .from('parcoursup_2')
-            .select('*')
-            .in('filiere_generale', geoFilter.formationTypes)
-            .neq('pct_admis_neo_pro', '0')
-            .not('pct_admis_neo_pro', 'is', null)
-            .range(from, from + PAGE_SIZE - 1);
+            .select('*');
+            
+          if (geoFilter.formationTypes && geoFilter.formationTypes.length > 0) {
+            query = query.in('filiere_generale', geoFilter.formationTypes);
+          }
+
+          if (geoFilter.subFormationTypes && geoFilter.subFormationTypes.length > 0) {
+            query = query.in('filiere_detaillee_bis', geoFilter.subFormationTypes);
+          }
+
+          const { data, error } = await query.range(from, from + PAGE_SIZE - 1);
           
-          if (error) throw error;
+          if (error) {
+            console.error(error);
+            throw error;
+          }
           if (data && data.length > 0) {
             allP2Data = [...allP2Data, ...data];
             if (data.length < PAGE_SIZE) {
@@ -456,6 +505,7 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
               filiere_generale: row.filiere_generale || "",
               filiere_formation: row.filiere_formation || "",
               filiere_detaillee: row.filiere_detaillee || "",
+              filiere_detaillee_bis: row.filiere_detaillee_bis || "",
               etablissement: row.etablissement || "",
               commune: row.commune || "",
               departement: row.departement || "",
@@ -491,13 +541,18 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
     };
     
     loadMapData();
-  }, [geoFilter.formationTypes]);
+  }, [geoFilter.formationTypes, geoFilter.subFormationTypes]);
 
   const filteredMapData = useMemo(() => {
-    if (geoFilter.formationTypes.length === 0) return [];
-    
     let base = [...mapData];
-    base = base.filter(f => geoFilter.formationTypes.includes(f.filiere_generale));
+    
+    if (geoFilter.formationTypes && geoFilter.formationTypes.length > 0) {
+      base = base.filter(f => geoFilter.formationTypes.includes(f.filiere_generale));
+    }
+
+    if (geoFilter.subFormationTypes && geoFilter.subFormationTypes.length > 0) {
+      base = base.filter(f => geoFilter.subFormationTypes.includes(f.filiere_detaillee_bis));
+    }
 
     if (geoFilter.city) {
       base = base.filter(f => f.commune.toLowerCase().includes(geoFilter.city.toLowerCase()));
@@ -721,7 +776,7 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
                   <div className="relative">
                     <select
                       value={proOnboardingData.targetFormation}
-                      onChange={(e) => setProOnboardingData(p => ({ ...p, targetFormation: e.target.value }))}
+                      onChange={(e) => setProOnboardingData(p => ({ ...p, targetFormation: e.target.value, targetSubFormation: '' }))}
                       className="w-full text-base font-bold text-slate-900 bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 outline-none focus:ring-4 focus:ring-primary/10 focus:bg-white transition-all appearance-none cursor-pointer"
                     >
                       <option value="">Sélectionner une formation...</option>
@@ -733,6 +788,26 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
                       <ChevronDown className="w-5 h-5" />
                     </div>
                   </div>
+
+                  {/* Sub Formation (Only if relevant) */}
+                  {proOnboardingData.targetFormation && formationHierarchy[proOnboardingData.targetFormation] && formationHierarchy[proOnboardingData.targetFormation].length > 1 && (
+                    <div className="relative mt-2 animate-in fade-in slide-in-from-top-4 duration-300">
+                      <p className="text-xs font-bold text-slate-500 mb-2">Spécialité précise (Optionnel)</p>
+                      <select
+                        value={proOnboardingData.targetSubFormation || ''}
+                        onChange={(e) => setProOnboardingData(p => ({ ...p, targetSubFormation: e.target.value }))}
+                        className="w-full text-sm font-bold text-slate-700 bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 outline-none focus:ring-4 focus:ring-primary/10 focus:bg-white transition-all appearance-none cursor-pointer"
+                      >
+                        <option value="">Toutes les spécialités...</option>
+                        {formationHierarchy[proOnboardingData.targetFormation].map((type, idx) => (
+                          <option key={idx} value={type}>{type}</option>
+                        ))}
+                      </select>
+                      <div className="absolute right-4 top-[2.2rem] pointer-events-none text-slate-400">
+                        <ChevronDown className="w-4 h-4" />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Section 3: Moyenne Attendue / Obtenue */}
@@ -829,7 +904,8 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
                       setGeoFilter(prev => ({
                         ...prev,
                         department: proOnboardingData.department,
-                        formationTypes: proOnboardingData.targetFormation ? [proOnboardingData.targetFormation] : prev.formationTypes
+                        formationTypes: proOnboardingData.targetFormation ? [proOnboardingData.targetFormation] : prev.formationTypes,
+                        subFormationTypes: proOnboardingData.targetSubFormation ? [proOnboardingData.targetSubFormation] : []
                       }));
                       setShowProOnboarding(false);
                     }}
@@ -1174,10 +1250,12 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
           selectedDepartment={geoFilter.department || undefined}
           selectedCity={geoFilter.city || undefined}
           selectedFormations={geoFilter.formationTypes}
+          selectedSubFormations={geoFilter.subFormationTypes}
           allDataOfSameType={mapData}
           allFormationTypes={allFormationTypes}
           allCities={allCities}
           allDepartments={allDepartments}
+          formationHierarchy={formationHierarchy}
           onFilterChange={(filters) => setGeoFilter(prev => ({ ...prev, ...filters }))}
           onShowOnMap={handleShowOnMap}
           pageType="pro"

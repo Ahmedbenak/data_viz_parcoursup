@@ -192,6 +192,7 @@ interface OnboardingProps {
   loadingSpecialties: boolean;
   allFormationTypes: string[];
   allDepartments: string[];
+  formationHierarchy?: Record<string, string[]>;
   onBack?: () => void;
 }
 
@@ -201,6 +202,7 @@ export interface OnboardingData {
   specialty: string;
   averageBac: string;
   targetFormationTypes: string[];
+  targetSubFormationTypes?: string[];
   department: string;
 }
 
@@ -210,6 +212,7 @@ export default function OnboardingQuestionnaire({
   individualSpecialties, 
   allFormationTypes,
   allDepartments,
+  formationHierarchy = {},
   loadingSpecialties,
   onBack
 }: OnboardingProps) {
@@ -402,10 +405,35 @@ export default function OnboardingQuestionnaire({
                     <MultiSearchableSelect
                       options={allFormationTypes}
                       selectedValues={data.targetFormationTypes}
-                      onChange={(vals) => setData({ ...data, targetFormationTypes: vals })}
+                      onChange={(vals) => {
+                        // Reset sub-formations if main selections change
+                        setData({ ...data, targetFormationTypes: vals, targetSubFormationTypes: [] });
+                      }}
                       placeholder="Rechercher des formations..."
                     />
                   </div>
+                  
+                  {/* Sub-formations filter (only shown if relevant) */}
+                  {(() => {
+                    const availableSubFormations = Array.from(new Set(
+                      data.targetFormationTypes.flatMap(type => formationHierarchy[type] || [])
+                    )).sort() as string[];
+                    
+                    if (availableSubFormations.length > 0) {
+                      return (
+                        <div className="mt-4 animate-in fade-in slide-in-from-top-4 duration-300">
+                          <p className="text-xs font-bold text-slate-500 mb-2">Spécialité précise (Optionnel)</p>
+                          <MultiSearchableSelect
+                            options={availableSubFormations}
+                            selectedValues={data.targetSubFormationTypes || []}
+                            onChange={(vals) => setData({ ...data, targetSubFormationTypes: vals })}
+                            placeholder="Toutes les spécialités..."
+                          />
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
 
                 {/* Département */}

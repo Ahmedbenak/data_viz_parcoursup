@@ -259,6 +259,7 @@ export default function App() {
     city: '',
     department: '',
     formationTypes: [] as string[],
+    subFormationTypes: [] as string[],
     radius: 1000, 
     center: [46.603354, 1.888334] as [number, number],
     zoom: 6
@@ -286,6 +287,7 @@ export default function App() {
   const [allCities, setAllCities] = useState<string[]>([]);
   const [showCitySuggestions, setShowCitySuggestions] = useState(false);
   const [allDepartments, setAllDepartments] = useState<string[]>([]);
+  const [formationHierarchy, setFormationHierarchy] = useState<Record<string, string[]>>({});
   const [showDeptSuggestions, setShowDeptSuggestions] = useState(false);
   const [deptSearchQuery, setDeptSearchQuery] = useState('');
 
@@ -310,6 +312,7 @@ export default function App() {
       city: '',
       department: '',
       formationTypes: [] as string[],
+      subFormationTypes: [] as string[],
       radius: 1000,
       center: [46.603354, 1.888334] as [number, number],
       zoom: 6
@@ -413,6 +416,46 @@ export default function App() {
         setAllDepartments(deptData.map((row: any) => row.dept));
       }
 
+      // Fetch the hierarchy for sub-formations
+      let hasMoreHierarchy = true;
+      let hierarchyFrom = 0;
+      let rawHierarchy: { filiere_generale: string; filiere_detaillee_bis: string }[] = [];
+      while (hasMoreHierarchy) {
+        const { data: hData, error: hError } = await supabase
+          .from('parcoursup_2')
+          .select('filiere_generale, filiere_detaillee_bis')
+          .range(hierarchyFrom, hierarchyFrom + 999);
+        
+        if (hError) {
+          console.error('Error loading hierarchy:', hError);
+          break;
+        }
+        
+        if (hData && hData.length > 0) {
+          rawHierarchy = [...rawHierarchy, ...hData];
+          hierarchyFrom += 1000;
+          if (hData.length < 1000) hasMoreHierarchy = false;
+        } else {
+          hasMoreHierarchy = false;
+        }
+      }
+
+      const newHierarchy: Record<string, Set<string>> = {};
+      rawHierarchy.forEach(row => {
+        if (row.filiere_generale && row.filiere_detaillee_bis) {
+          if (!newHierarchy[row.filiere_generale]) {
+            newHierarchy[row.filiere_generale] = new Set();
+          }
+          newHierarchy[row.filiere_generale].add(row.filiere_detaillee_bis);
+        }
+      });
+      
+      const formattedHierarchy: Record<string, string[]> = {};
+      for (const key in newHierarchy) {
+        formattedHierarchy[key] = Array.from(newHierarchy[key]).sort();
+      }
+      setFormationHierarchy(formattedHierarchy);
+
     } catch (err: any) {
       console.error('Error loading initial data:', err);
       setError("Erreur lors du chargement des données initiales.");
@@ -428,11 +471,6 @@ export default function App() {
   // Step 2: Load map specific data when formation types change
   useEffect(() => {
     const loadMapData = async () => {
-      if (geoFilter.formationTypes.length === 0) {
-        setMapSpecificData([]);
-        return;
-      }
-      
       try {
         setLoadingMap(true);
         const supabase = getSupabase();
@@ -442,15 +480,24 @@ export default function App() {
         let hasMore = true;
 
         while (hasMore) {
-          const { data, error } = await supabase
+          let query = supabase
             .from('parcoursup_2')
-            .select('*')
-            .in('filiere_generale', geoFilter.formationTypes)
-            .neq('pct_admis_neo_gen', '0')
-            .not('pct_admis_neo_gen', 'is', null)
-            .range(from, from + PAGE_SIZE - 1);
+            .select('*');
+
+          if (geoFilter.formationTypes && geoFilter.formationTypes.length > 0) {
+            query = query.in('filiere_generale', geoFilter.formationTypes);
+          }
+
+          if (geoFilter.subFormationTypes && geoFilter.subFormationTypes.length > 0) {
+            query = query.in('filiere_detaillee_bis', geoFilter.subFormationTypes);
+          }
+
+          const { data, error } = await query.range(from, from + PAGE_SIZE - 1);
           
-          if (error) throw error;
+          if (error) {
+            console.error(error);
+            throw error;
+          }
           if (data && data.length > 0) {
             allP2Data = [...allP2Data, ...data];
             
@@ -460,6 +507,7 @@ export default function App() {
                 filiere_generale: row.filiere_generale || "",
                 filiere_formation: row.filiere_formation || "",
                 filiere_detaillee: row.filiere_detaillee || "",
+                filiere_detaillee_bis: row.filiere_detaillee_bis || "",
                 etablissement: row.etablissement || "",
                 commune: row.commune || "",
                 departement: row.departement || "",
@@ -504,7 +552,7 @@ export default function App() {
     };
     
     loadMapData();
-  }, [geoFilter.formationTypes]);
+  }, [geoFilter.formationTypes, geoFilter.subFormationTypes]);
 
   useEffect(() => {
     const loadSpecialtyData = async () => {
@@ -583,7 +631,8 @@ export default function App() {
       department: data.department || '',
       formationTypes: data.targetFormationTypes && data.targetFormationTypes.length > 0 
         ? data.targetFormationTypes 
-        : prev.formationTypes
+        : prev.formationTypes,
+      subFormationTypes: data.targetSubFormationTypes || []
     }));
     
     sessionStorage.setItem('parcoursup_general_onboarding', JSON.stringify(data));
@@ -660,10 +709,15 @@ export default function App() {
   }, [mapSpecificData]);
 
   const mapFormations = useMemo(() => {
-    if (geoFilter.formationTypes.length === 0) return [];
-    
     let base = [...unfilteredMapFormations];
-    base = base.filter(f => geoFilter.formationTypes.includes(f.filiere_generale));
+    
+    if (geoFilter.formationTypes && geoFilter.formationTypes.length > 0) {
+      base = base.filter(f => geoFilter.formationTypes.includes(f.filiere_generale));
+    }
+
+    if (geoFilter.subFormationTypes && geoFilter.subFormationTypes.length > 0) {
+      base = base.filter(f => geoFilter.subFormationTypes.includes(f.filiere_detaillee_bis));
+    }
 
     // Filter by City
     if (geoFilter.city) {
@@ -813,6 +867,7 @@ export default function App() {
           loadingSpecialties={loading}
           allFormationTypes={allFormationTypes}
           allDepartments={allDepartments}
+          formationHierarchy={formationHierarchy}
           onBack={handleReset}
         />
       </div>
@@ -1254,10 +1309,12 @@ export default function App() {
                   selectedDepartment={geoFilter.department || undefined}
                   selectedCity={geoFilter.city || undefined}
                   selectedFormations={geoFilter.formationTypes}
+                  selectedSubFormations={geoFilter.subFormationTypes}
                   allDataOfSameType={unfilteredMapFormations}
                   allFormationTypes={allFormationTypes}
                   allCities={allCities}
                   allDepartments={allDepartments}
+                  formationHierarchy={formationHierarchy}
                   onFilterChange={(filters) => setGeoFilter(prev => ({ ...prev, ...filters }))}
                   onShowOnMap={handleShowOnMap}
                   pageType="general"

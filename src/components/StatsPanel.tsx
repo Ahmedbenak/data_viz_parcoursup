@@ -73,9 +73,9 @@ interface Parcoursup2Data {
   taux_acces: number | null;
   note_moyenne: number | null;
   selectivite: string;
-  pct_admis_neo_gen: number;
-  pct_admis_neo_techno: number;
-  pct_admis_neo_pro: number;
+  pct_admis_neo_gen?: number;
+  pct_admis_neo_techno?: number;
+  pct_admis_neo_pro?: number;
   lien_parcoursup?: string;
   pct_boursiers?: number;
   pct_admis_neo_boursiers?: number;
@@ -94,11 +94,13 @@ interface StatsPanelProps {
   selectedDepartment?: string;
   selectedCity?: string;
   selectedFormations?: string[];
+  selectedSubFormations?: string[];
   allDataOfSameType: Parcoursup2Data[];
   allFormationTypes: string[];
   allCities: string[];
   allDepartments: string[];
-  onFilterChange: (filters: { city?: string; department?: string; formationTypes?: string[] }) => void;
+  formationHierarchy?: Record<string, string[]>;
+  onFilterChange: (filters: { city?: string; department?: string; formationTypes?: string[]; subFormationTypes?: string[] }) => void;
   onShowOnMap?: (formation: Parcoursup2Data) => void;
   pageType: 'general' | 'pro';
   loading?: boolean;
@@ -110,10 +112,12 @@ export default function StatsPanel({
   selectedDepartment, 
   selectedCity, 
   selectedFormations, 
+  selectedSubFormations,
   allDataOfSameType, 
   allFormationTypes,
   allCities,
   allDepartments,
+  formationHierarchy = {},
   onFilterChange,
   onShowOnMap,
   pageType,
@@ -126,6 +130,7 @@ export default function StatsPanel({
   
   // Filter bar states
   const [showFormationDropdown, setShowFormationDropdown] = useState(false);
+  const [showSubFormationDropdown, setShowSubFormationDropdown] = useState(false);
   const [citySearch, setCitySearch] = useState(selectedCity || '');
   const [showCityDropdown, setShowCityDropdown] = useState(false);
   const [deptSearch, setDeptSearch] = useState(selectedDepartment || '');
@@ -294,9 +299,9 @@ export default function StatsPanel({
       meanNote,
       stdDevNote,
       tauxAcces: avg(validData.map(d => d.taux_acces || 0)),
-      neoGen: avg(validData.map(d => d.pct_admis_neo_gen)),
-      neoTechno: avg(validData.map(d => d.pct_admis_neo_techno)),
-      neoPro: avg(validData.map(d => d.pct_admis_neo_pro)),
+      neoGen: avg(validData.map(d => d.pct_admis_neo_gen || 0)),
+      neoTechno: avg(validData.map(d => d.pct_admis_neo_techno || 0)),
+      neoPro: avg(validData.map(d => d.pct_admis_neo_pro || 0)),
       boursiers: (() => {
         const totalBoursiers = allDataOfSameType.reduce((sum, d) => sum + (d.eff_admis_boursiers_neo || 0), 0);
         const totalAdmis = allDataOfSameType.reduce((sum, d) => sum + (d.eff_admis_neo || 0), 0);
@@ -430,6 +435,11 @@ export default function StatsPanel({
                   ? selectedFormations.join(', ') 
                   : 'Toutes les formations'}
               </span>
+              {(selectedSubFormations && selectedSubFormations.length > 0) && (
+                <span className="block text-lg mt-1 text-slate-500 font-medium">
+                  Spécialités : {selectedSubFormations.join(', ')}
+                </span>
+              )}
             </h3>
             <p className="text-slate-500 font-medium text-lg mt-2 flex items-center gap-2">
               <MapPin className="w-4 h-4" />
@@ -605,8 +615,16 @@ export default function StatsPanel({
 
       {/* Dynamic Filter Bar */}
       <div className="dynamic-filter-bar bg-white p-4 rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-200/50 flex flex-wrap items-center gap-4 relative z-50">
-          {/* Formation Filter */}
-          <div className="flex-1 min-w-[200px] relative">
+        {(() => {
+          const availableSubFormations = Array.from(new Set(
+            (selectedFormations && selectedFormations.length > 0 ? selectedFormations : allFormationTypes)
+              .flatMap(type => formationHierarchy[type] || [])
+          )).sort() as string[];
+
+          return (
+            <>
+              {/* Formation Filter */}
+              <div className="flex-1 min-w-[200px] relative">
             <button 
               onClick={() => setShowFormationDropdown(!showFormationDropdown)}
               className="w-full h-12 px-6 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-between text-sm font-bold text-slate-700 hover:bg-slate-100 transition-all"
@@ -638,7 +656,7 @@ export default function StatsPanel({
                               const newList = isSelected 
                                 ? selectedFormations?.filter(t => t !== type) 
                                 : [...(selectedFormations || []), type];
-                              onFilterChange({ formationTypes: newList });
+                              onFilterChange({ formationTypes: newList, subFormationTypes: [] });
                             }}
                             className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary"
                           />
@@ -651,6 +669,55 @@ export default function StatsPanel({
               </>
             )}
           </div>
+
+          {/* Sub-Formation Filter */}
+          {availableSubFormations.length > 0 && (
+            <div className="flex-1 min-w-[200px] relative">
+              <button 
+                onClick={() => setShowSubFormationDropdown(!showSubFormationDropdown)}
+                className="w-full h-12 px-6 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-between text-sm font-bold text-slate-700 hover:bg-slate-100 transition-all"
+              >
+                <div className="flex items-center gap-2 truncate">
+                  <GraduationCap className="w-4 h-4 text-primary" />
+                  <span className="truncate">
+                    {selectedSubFormations && selectedSubFormations.length > 0 
+                      ? `${selectedSubFormations.length} spécialités sélectionnées` 
+                      : 'Toutes les spécialités'}
+                  </span>
+                </div>
+                <ChevronDown className={cn("w-4 h-4 transition-transform", showSubFormationDropdown && "rotate-180")} />
+              </button>
+              
+              {showSubFormationDropdown && (
+                <>
+                  <div className="fixed inset-0 z-[60]" onClick={() => setShowSubFormationDropdown(false)} />
+                  <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-2xl z-[70] p-4 max-h-[300px] overflow-y-auto custom-scrollbar">
+                    <div className="space-y-2">
+                      {availableSubFormations.map((type, i) => {
+                        const isSelected = selectedSubFormations?.includes(type);
+                        return (
+                          <label key={i} className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-xl cursor-pointer transition-colors">
+                            <input 
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => {
+                                const newList = isSelected 
+                                  ? selectedSubFormations?.filter(t => t !== type) 
+                                  : [...(selectedSubFormations || []), type];
+                                onFilterChange({ subFormationTypes: newList });
+                              }}
+                              className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary"
+                            />
+                            <span className="text-sm font-bold text-slate-600">{type}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
 
           {/* City Filter */}
           <div className="flex-1 min-w-[200px] relative">
@@ -762,12 +829,15 @@ export default function StatsPanel({
 
           {/* Reset Filters */}
           <button 
-            onClick={() => onFilterChange({ city: '', department: '', formationTypes: [] })}
+            onClick={() => onFilterChange({ city: '', department: '', formationTypes: [], subFormationTypes: [] })}
             className="h-12 px-6 rounded-2xl bg-rose-50 text-rose-500 text-sm font-black uppercase tracking-wider hover:bg-rose-100 transition-all flex items-center gap-2"
           >
             <X className="w-4 h-4" />
             Réinitialiser
           </button>
+            </>
+          );
+        })()}
         </div>
 
       <div className={cn("space-y-16 transition-all duration-500 relative", isEmpty && "opacity-50")}>
