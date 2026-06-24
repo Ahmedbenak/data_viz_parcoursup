@@ -343,7 +343,7 @@ export default function StatsPanel({
 
   // Local/Departmental Profile for comparison
   const departmentalProfile = useMemo(() => {
-    if (!selectedDepartment) return null;
+    if (!selectedDepartment || selectedDepartment.toLowerCase() === 'toute la france') return null;
     const departmentalData = allDataOfSameType.filter(d => 
       d.departement.toLowerCase() === selectedDepartment.toLowerCase() && 
       d.note_moyenne !== null
@@ -1277,7 +1277,7 @@ export default function StatsPanel({
                       </div>
                     </div>
 
-                    {selectedDepartment && (
+                    {selectedDepartment && selectedDepartment.toLowerCase() !== 'toute la france' && (
                       <div className="flex flex-col text-right">
                         <span className="text-[9px] font-black text-[#E30613]/60 uppercase tracking-widest mb-0.5">{selectedDepartment}</span>
                         <div className="text-2.5xl font-black text-[#E30613] tracking-tighter">
@@ -1297,7 +1297,7 @@ export default function StatsPanel({
               ))
             )}
 
-            {selectedDepartment && (
+            {selectedDepartment && selectedDepartment.toLowerCase() !== 'toute la france' && (
               <motion.div 
                 initial={isExporting ? false : { opacity: 0 }}
                 animate={isExporting ? { opacity: 1 } : undefined}
@@ -1320,7 +1320,7 @@ export default function StatsPanel({
               </motion.div>
             )}
 
-            {!selectedDepartment && (
+            {(!selectedDepartment || selectedDepartment.toLowerCase() === 'toute la france') && (
               <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-dashed border-slate-200 text-center">
                 <p className="text-sm text-slate-400 font-black uppercase tracking-widest leading-relaxed">
                   Sélectionnez un département sur la carte pour comparer les statistiques locales au niveau national.

@@ -88,6 +88,28 @@ let DefaultIcon = L.icon({
 });
 L.Marker.prototype.options.icon = DefaultIcon;
 
+const getFormationPotential = (f: Parcoursup2Data, userNote: number | null): 'secure' | 'realiste' | 'ambitieux' | 'sans_note' => {
+  if (userNote === null || userNote === 0 || isNaN(userNote) || f.note_moyenne === null || isNaN(f.note_moyenne)) {
+    return 'sans_note';
+  }
+  if (f.note_moyenne <= userNote - 0.5) {
+    return 'secure';
+  }
+  if (f.note_moyenne > userNote - 0.5 && f.note_moyenne <= userNote + 0.5) {
+    return 'realiste';
+  }
+  return 'ambitieux';
+};
+
+const getPotentialColor = (potential: string) => {
+  switch (potential) {
+    case 'secure': return '#10b981'; // emerald-500
+    case 'realiste': return '#fbbf24'; // amber-400
+    case 'ambitieux': return '#f43f5e'; // rose-500
+    default: return '#94a3b8'; // slate-400
+  }
+};
+
 interface OrientationData {
   "specialites": string;
   "formation": string;
@@ -158,7 +180,7 @@ function MapUpdater({ center, zoom, department, formations }: { center: [number,
   
   useEffect(() => {
     // 1. If we have a specific department, focus on it
-    if (department && formations.length > 0 && center[0] === 46.603354) {
+    if (department && department.toLowerCase() !== 'toute la france' && formations.length > 0 && center[0] === 46.603354) {
       const departmentMarkers = formations.filter(f => 
         f.departement.toLowerCase() === department.toLowerCase() && f.position
       );
@@ -264,6 +286,8 @@ export default function App() {
     center: [46.603354, 1.888334] as [number, number],
     zoom: 6
   });
+
+  const [selectedPotentialFilters, setSelectedPotentialFilters] = useState<string[]>(['secure', 'realiste', 'ambitieux', 'sans_note']);
 
   const [showFormationSuggestions, setShowFormationSuggestions] = useState(false);
   const [targetFormation, setTargetFormation] = useState<{data: Parcoursup2Data, timestamp: number} | null>(null);
@@ -413,7 +437,7 @@ export default function App() {
       }
 
       if (deptData) {
-        setAllDepartments(deptData.map((row: any) => row.dept));
+        setAllDepartments(["Toute la France", ...deptData.map((row: any) => row.dept)]);
       }
 
       // Fetch the hierarchy for sub-formations
@@ -725,9 +749,16 @@ export default function App() {
     }
 
     // Filter by Department (Exact match to avoid partial matches like "Ain" in "Ille-et-Vilaine")
-    if (geoFilter.department) {
+    if (geoFilter.department && geoFilter.department.toLowerCase() !== 'toute la france') {
       base = base.filter(f => f.departement.toLowerCase() === geoFilter.department.toLowerCase());
     }
+
+    // Filter by Potential
+    const userNote = filterAverage ? parseFloat(filterAverage) : (onboardingData ? parseFloat(onboardingData.averageBac) : null);
+    base = base.filter(f => {
+      const potential = getFormationPotential(f, userNote);
+      return selectedPotentialFilters.includes(potential);
+    });
 
     const mapped = base.map(f => {
       const coords = f.coordonnees_gps.split(',').map(c => parseFloat(c.trim()));
@@ -746,7 +777,7 @@ export default function App() {
     }
 
     return mapped;
-  }, [unfilteredMapFormations, geoFilter]);
+  }, [unfilteredMapFormations, geoFilter, selectedPotentialFilters, filterAverage, onboardingData]);
 
   const groupedMapFormations = useMemo(() => {
     const groups = new Map<string, (Parcoursup2Data & { position: [number, number] })[]>();
@@ -759,16 +790,29 @@ export default function App() {
       groups.get(key)!.push(f as any);
     });
     
+    const userNote = filterAverage ? parseFloat(filterAverage) : (onboardingData ? parseFloat(onboardingData.averageBac) : null);
+    
     return Array.from(groups.values()).map(group => {
       const types = Array.from(new Set(group.map(f => f.filiere_generale)));
+      
+      let colors: string[];
+      if (userNote !== null && userNote > 0) {
+        // Color by potential
+        const potentials = group.map(f => getFormationPotential(f, userNote));
+        colors = Array.from(new Set(potentials)).map(p => getPotentialColor(p));
+      } else {
+        // Color by formation type
+        colors = types.map(t => getFormationColor(t));
+      }
+      
       return {
         formations: group,
         types,
         position: group[0].position,
-        colors: types.map(t => getFormationColor(t))
+        colors
       };
     });
-  }, [mapFormations, getFormationColor]);
+  }, [mapFormations, getFormationColor, filterAverage, onboardingData]);
 
   const formationTypes = useMemo(() => {
     return allFormationTypes;
@@ -1296,33 +1340,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* Phase 2: Comparisons */}
-            <div 
-              id="section-phase-2"
-              className="scroll-mt-32 transition-all duration-500 relative"
-            >
-              {onboardingData && (
-                <StatsPanel 
-                  data={mapFormations} 
-                  loading={loadingMap}
-                  userNote={parseFloat(filterAverage)}
-                  selectedDepartment={geoFilter.department || undefined}
-                  selectedCity={geoFilter.city || undefined}
-                  selectedFormations={geoFilter.formationTypes}
-                  selectedSubFormations={geoFilter.subFormationTypes}
-                  allDataOfSameType={unfilteredMapFormations}
-                  allFormationTypes={allFormationTypes}
-                  allCities={allCities}
-                  allDepartments={allDepartments}
-                  formationHierarchy={formationHierarchy}
-                  onFilterChange={(filters) => setGeoFilter(prev => ({ ...prev, ...filters }))}
-                  onShowOnMap={handleShowOnMap}
-                  pageType="general"
-                />
-              )}
-            </div>
-
-            {/* Phase 3: Cartographie */}
+            {/* Phase 3: Cartographie (Moved up) */}
             <div 
               id="section-phase-3"
               className="scroll-mt-32 transition-all duration-500 relative"
@@ -1372,7 +1390,7 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="h-[550px] w-full relative z-0 overflow-hidden">
+                <div className="h-[480px] w-full relative z-0 overflow-hidden">
                   {geoFilter.formationTypes.length === 0 ? (
                     <div className="absolute inset-0 z-10 bg-slate-900/5 backdrop-blur-[2px] flex items-center justify-center p-6 text-center">
                       <div className="bg-white p-8 rounded-3xl shadow-xl border border-slate-100 max-w-sm">
@@ -1394,6 +1412,7 @@ export default function App() {
                       </div>
                     </div>
                   ) : null}
+
                   <MapContainer 
                     center={geoFilter.center} 
                     zoom={6} 
@@ -1416,6 +1435,8 @@ export default function App() {
                         f.filiere_formation === targetFormation.data.filiere_formation &&
                         f.coordonnees_gps === targetFormation.data.coordonnees_gps
                       );
+
+                      const popupUserNote = filterAverage ? parseFloat(filterAverage) : (onboardingData ? parseFloat(onboardingData.averageBac) : null);
 
                       return (
                         <MarkerWithAutoPopup 
@@ -1443,7 +1464,31 @@ export default function App() {
                                 <p className="text-xs text-slate-500 mb-1 leading-relaxed">{f.filiere_formation}</p>
                                 {f.filiere_detaillee && <p className="text-[10px] italic text-primary font-medium mb-1">{f.filiere_detaillee}</p>}
                                 <p className="text-xs font-medium text-primary-dark mb-1">{f.selectivite}</p>
-                                <p className="text-xs text-slate-500 mb-2">{f.commune} ({f.departement})</p>
+                                <p className="text-xs text-slate-500 mb-1">{f.commune} ({f.departement})</p>
+                                
+                                <div className="flex items-center gap-1.5 mb-2.5">
+                                  <span className="text-[10px] font-bold text-slate-400">Potentiel :</span>
+                                  {(() => {
+                                    const potential = getFormationPotential(f, popupUserNote);
+                                    let badgeColor = "bg-slate-100 text-slate-600 border-slate-200";
+                                    let label = "Non classé";
+                                    if (potential === 'secure') {
+                                      badgeColor = "bg-emerald-50 text-emerald-700 border-emerald-200";
+                                      label = "Sécure";
+                                    } else if (potential === 'realiste') {
+                                      badgeColor = "bg-amber-50 text-amber-700 border-amber-200";
+                                      label = "Réaliste";
+                                    } else if (potential === 'ambitieux') {
+                                      badgeColor = "bg-rose-50 text-rose-700 border-rose-200";
+                                      label = "Ambitieux";
+                                    }
+                                    return (
+                                      <span className={cn("px-1.5 py-0.5 rounded-md border text-[9px] font-black uppercase tracking-wider", badgeColor)}>
+                                        {label}
+                                      </span>
+                                    );
+                                  })()}
+                                </div>
                                 
                                 <div className="grid grid-cols-2 gap-2">
                                   <div className="bg-slate-50 p-2 rounded-lg">
@@ -1492,7 +1537,96 @@ export default function App() {
                     )}
                   </MapContainer>
                 </div>
+
+                {/* Legend and filter footer bar */}
+                {geoFilter.formationTypes.length > 0 && (
+                  <div className="bg-slate-50 border-t border-slate-200 p-4 rounded-b-3xl flex flex-col lg:flex-row items-center justify-between gap-4">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full lg:w-auto">
+                      <div className="flex items-center gap-2 text-slate-800 shrink-0">
+                        <Target className="w-5 h-5 text-primary" />
+                        <span className="text-xs font-black uppercase tracking-wider">Ton potentiel :</span>
+                      </div>
+                      
+                      <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+                        {[
+                          { id: 'secure', label: 'Sécure', color: 'bg-emerald-500', desc: 'Note supérieure aux admis' },
+                          { id: 'realiste', label: 'Réaliste', color: 'bg-amber-400', desc: 'Profil type' },
+                          { id: 'ambitieux', label: 'Ambitieux', color: 'bg-rose-500', desc: 'Un peu juste' },
+                          { id: 'sans_note', label: 'Sans note / Non classé', color: 'bg-slate-400', desc: 'Aucun seuil défini' }
+                        ].map((item) => {
+                          const isSelected = selectedPotentialFilters.includes(item.id);
+                          return (
+                            <button
+                              key={item.id}
+                              onClick={() => {
+                                setSelectedPotentialFilters(prev => 
+                                  prev.includes(item.id) 
+                                    ? prev.filter(id => id !== item.id) 
+                                    : [...prev, item.id]
+                                );
+                              }}
+                              className={cn(
+                                "flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all hover:bg-white shadow-xs",
+                                isSelected 
+                                  ? "border-slate-200 bg-white text-slate-700" 
+                                  : "border-transparent bg-slate-100 text-slate-400 opacity-50 hover:opacity-100"
+                              )}
+                              title={item.desc}
+                            >
+                              <div className={cn("w-2.5 h-2.5 rounded-full shrink-0", item.color)} />
+                              <span>{item.label}</span>
+                              {item.id === 'sans_note' && !filterAverage && (
+                                <span className="text-[8px] font-black uppercase tracking-wider text-amber-600 bg-amber-50 px-1 rounded ml-1">Actif</span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 w-full lg:w-auto border-t lg:border-t-0 pt-3 lg:pt-0 border-slate-200">
+                      <span className="text-xs font-bold text-slate-500 shrink-0">Ta moyenne :</span>
+                      <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-sm w-full sm:w-auto">
+                        <input 
+                          type="text" 
+                          inputMode="decimal"
+                          placeholder="Moyenne"
+                          value={filterAverage}
+                          onChange={(e) => setFilterAverage(e.target.value)}
+                          className="w-16 text-center font-black text-slate-800 placeholder-slate-400 focus:outline-none text-xs"
+                        />
+                        <span className="text-xs font-bold text-slate-400 shrink-0">/ 20</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
+            </div>
+
+            {/* Phase 2: Comparisons (Moved down) */}
+            <div 
+              id="section-phase-2"
+              className="scroll-mt-32 transition-all duration-500 relative"
+            >
+              {onboardingData && (
+                <StatsPanel 
+                  data={mapFormations} 
+                  loading={loadingMap}
+                  userNote={parseFloat(filterAverage)}
+                  selectedDepartment={geoFilter.department || undefined}
+                  selectedCity={geoFilter.city || undefined}
+                  selectedFormations={geoFilter.formationTypes}
+                  selectedSubFormations={geoFilter.subFormationTypes}
+                  allDataOfSameType={unfilteredMapFormations}
+                  allFormationTypes={allFormationTypes}
+                  allCities={allCities}
+                  allDepartments={allDepartments}
+                  formationHierarchy={formationHierarchy}
+                  onFilterChange={(filters) => setGeoFilter(prev => ({ ...prev, ...filters }))}
+                  onShowOnMap={handleShowOnMap}
+                  pageType="general"
+                />
+              )}
             </div>
           </div>
         </div>

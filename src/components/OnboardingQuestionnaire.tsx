@@ -17,173 +17,11 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-function SearchableSelect({ 
-  options, 
-  value, 
-  onChange, 
-  placeholder,
-  disabled = false,
-  error
-}: { 
-  options: string[]; 
-  value: string; 
-  onChange: (val: string) => void;
-  placeholder: string;
-  disabled?: boolean;
-  error?: boolean;
-}) {
-  const [search, setSearch] = React.useState(value);
-  const [isOpen, setIsOpen] = React.useState(false);
-  const wrapperRef = React.useRef<HTMLDivElement>(null);
+import { SearchableSelect, MultiSearchableSelect } from './SearchableSelects';
 
-  React.useEffect(() => {
-    setSearch(value);
-  }, [value]);
+// SearchableSelect is now imported
 
-  React.useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-        if (!options.includes(search)) {
-          setSearch(value);
-        }
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [wrapperRef, search, value, options]);
-
-  const filteredOptions = options.filter(opt => opt.toLowerCase().includes(search.toLowerCase()));
-
-  return (
-    <div className="relative w-full" ref={wrapperRef}>
-      <input
-        type="text"
-        disabled={disabled}
-        value={search}
-        onChange={(e) => {
-          setSearch(e.target.value);
-          setIsOpen(true);
-        }}
-        onFocus={() => setIsOpen(true)}
-        placeholder={placeholder}
-        className={cn(
-          "w-full text-base font-bold text-slate-900 bg-slate-50 border rounded-2xl px-6 py-4 outline-none transition-all placeholder:text-slate-400",
-          disabled ? "border-slate-100 opacity-60 cursor-not-allowed" : "border-slate-100 focus:ring-4 focus:ring-primary/10 focus:bg-white",
-          error ? "border-red-500" : ""
-        )}
-      />
-      {isOpen && !disabled && (
-        <ul className="absolute z-20 w-full mt-2 bg-white border border-slate-100 rounded-2xl shadow-2xl max-h-60 overflow-y-auto p-2 custom-scrollbar">
-          {filteredOptions.length > 0 ? (
-            filteredOptions.map(opt => (
-              <li 
-                key={opt} 
-                className="w-full text-left px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 hover:text-primary rounded-xl transition-all cursor-pointer"
-                onClick={() => {
-                  onChange(opt);
-                  setSearch(opt);
-                  setIsOpen(false);
-                }}
-              >
-                {opt}
-              </li>
-            ))
-          ) : (
-             <li className="px-4 py-4 text-sm text-slate-400 italic text-center">Aucun résultat</li>
-          )}
-        </ul>
-      )}
-    </div>
-  )
-}
-
-function MultiSearchableSelect({
-  options,
-  selectedValues,
-  onChange,
-  placeholder
-}: {
-  options: string[];
-  selectedValues: string[];
-  onChange: (vals: string[]) => void;
-  placeholder: string;
-}) {
-  const [search, setSearch] = React.useState('');
-  const [isOpen, setIsOpen] = React.useState(false);
-  const wrapperRef = React.useRef<HTMLDivElement>(null);
-
-  React.useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-        setSearch(''); // clear search on close
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [wrapperRef]);
-
-  const availableOptions = options.filter(opt => !selectedValues.includes(opt));
-  const filteredOptions = availableOptions.filter(opt => opt.toLowerCase().includes(search.toLowerCase()));
-
-  const toggleOption = (opt: string) => {
-    if (selectedValues.includes(opt)) {
-      onChange(selectedValues.filter(v => v !== opt));
-    } else {
-      onChange([...selectedValues, opt]);
-    }
-    setSearch('');
-  };
-
-  return (
-    <div className="space-y-3 relative" ref={wrapperRef}>
-      <div className="relative">
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setIsOpen(true);
-          }}
-          onFocus={() => setIsOpen(true)}
-          placeholder={placeholder}
-          className="w-full text-base font-bold text-slate-900 bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 outline-none focus:ring-4 focus:ring-primary/10 focus:bg-white transition-all placeholder:text-slate-400"
-        />
-        {isOpen && (
-          <ul className="absolute z-20 w-full mt-2 bg-white border border-slate-100 rounded-2xl shadow-2xl max-h-60 overflow-y-auto p-2 custom-scrollbar">
-            {filteredOptions.length > 0 ? (
-              filteredOptions.map(opt => (
-                <li 
-                  key={opt} 
-                  className="w-full text-left px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 hover:text-primary rounded-xl transition-all cursor-pointer flex items-center justify-between"
-                  onClick={() => toggleOption(opt)}
-                >
-                  <span>{opt}</span>
-                </li>
-              ))
-            ) : (
-               <li className="px-4 py-4 text-sm text-slate-400 italic text-center">Aucun résultat</li>
-            )}
-          </ul>
-        )}
-      </div>
-
-      {selectedValues.length > 0 && (
-        <div className="flex flex-wrap gap-2 pt-2">
-          {selectedValues.map(val => (
-             <div key={val} className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary rounded-lg text-sm font-bold border border-primary/20">
-               <span>{val}</span>
-               <button type="button" onClick={() => toggleOption(val)} className="hover:bg-primary/20 rounded-full p-0.5">
-                 <X className="w-3.5 h-3.5" />
-               </button>
-             </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
+// MultiSearchableSelect is now imported
 
 interface OnboardingProps {
   onComplete: (data: OnboardingData) => void;
@@ -402,14 +240,14 @@ export default function OnboardingQuestionnaire({
                   </label>
 
                   <div>
-                    <MultiSearchableSelect
+                    <SearchableSelect
                       options={allFormationTypes}
-                      selectedValues={data.targetFormationTypes}
-                      onChange={(vals) => {
+                      value={data.targetFormationTypes[0] || ''}
+                      onChange={(val) => {
                         // Reset sub-formations if main selections change
-                        setData({ ...data, targetFormationTypes: vals, targetSubFormationTypes: [] });
+                        setData({ ...data, targetFormationTypes: val ? [val] : [], targetSubFormationTypes: [] });
                       }}
-                      placeholder="Rechercher des formations..."
+                      placeholder="Rechercher une formation..."
                     />
                   </div>
                   
