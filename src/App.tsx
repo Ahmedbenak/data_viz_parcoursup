@@ -36,6 +36,7 @@ import TrackSelection from './components/TrackSelection';
 import ProPage from './components/ProPage';
 import { Skeleton, CardSkeleton, TableSkeleton } from './components/Skeleton';
 import { motion, AnimatePresence } from 'motion/react';
+import { OrientationData, Parcoursup2Data } from './types';
 
 // Utility for tailwind classes
 function cn(...inputs: ClassValue[]) {
@@ -88,132 +89,13 @@ let DefaultIcon = L.icon({
 });
 L.Marker.prototype.options.icon = DefaultIcon;
 
-const getFormationPotential = (f: Parcoursup2Data, userNote: number | null): 'secure' | 'realiste' | 'ambitieux' | 'sans_note' => {
-  if (userNote === null || userNote === 0 || isNaN(userNote) || f.note_moyenne === null || isNaN(f.note_moyenne)) {
-    return 'sans_note';
-  }
-  if (f.note_moyenne <= userNote - 0.5) {
-    return 'secure';
-  }
-  if (f.note_moyenne > userNote - 0.5 && f.note_moyenne <= userNote + 0.5) {
-    return 'realiste';
-  }
-  return 'ambitieux';
-};
-
-const getPotentialColor = (potential: string) => {
-  switch (potential) {
-    case 'secure': return '#10b981'; // emerald-500
-    case 'realiste': return '#fbbf24'; // amber-400
-    case 'ambitieux': return '#f43f5e'; // rose-500
-    default: return '#94a3b8'; // slate-400
-  }
-};
-
-interface OrientationData {
-  "specialites": string;
-  "formation": string;
-  "candidats_voeu_confirme": number;
-  "candidats_proposition_recue": number;
-  "candidats_proposition_acceptee": number;
-}
-
-interface Parcoursup2Data {
-  filiere_generale: string;
-  filiere_formation: string;
-  filiere_detaillee?: string;
-  etablissement: string;
-  commune: string;
-  departement: string;
-  region: string;
-  coordonnees_gps: string;
-  eff_admis: number;
-  eff_admis_neo?: number;
-  capacite: number;
-  taux_acces: number | null;
-  note_moyenne: number | null;
-  selectivite: string;
-  pct_admis_neo_gen: number;
-  pct_admis_neo_techno: number;
-  pct_admis_neo_pro: number;
-  lien_parcoursup?: string;
-  pct_boursiers?: number;
-  pct_admis_neo_boursiers?: number;
-  eff_admis_boursiers_neo?: number;
-  pct_admises_filles?: number;
-  pct_admis_neo_sans_mention?: number;
-  pct_admis_neo_mention_ab?: number;
-  pct_admis_neo_mention_b?: number;
-  pct_admis_neo_mention_tb?: number;
-  pct_admis_neo_mention_tbf?: number;
-}
-
-const mapSupabaseData = (rawData: any[]): OrientationData[] => {
-  return rawData.map(row => ({
-    "specialites": row.specialites || "",
-    "formation": row.formation || "",
-    "candidats_voeu_confirme": Number(row.candidats_voeu_confirme || 0),
-    "candidats_proposition_recue": Number(row.candidats_proposition_recue || 0),
-    "candidats_proposition_acceptee": Number(row.candidats_proposition_acceptee || 0),
-  }));
-};
+import { getFormationPotential, getPotentialColor, mapSupabaseData, getDistance } from './lib/utils';
 
 const COLORS = ['#e30613', '#f43f5e', '#ec4899', '#8b5cf6', '#6366f1', '#10b981', '#06b6d4'];
 
-// Utility for distance calculation (Haversine formula)
-function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
-  const R = 6371; // km
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = 
-    Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-    Math.sin(dLon/2) * Math.sin(dLon/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  return R * c;
-}
-
 import Header from './components/Header';
-
-function MapUpdater({ center, zoom, department, formations }: { center: [number, number], zoom: number, department?: string, formations: any[] }) {
-  const map = useMap();
-  
-  useEffect(() => {
-    // 1. If we have a specific department, focus on it
-    if (department && department.toLowerCase() !== 'toute la france' && formations.length > 0 && center[0] === 46.603354) {
-      const departmentMarkers = formations.filter(f => 
-        f.departement.toLowerCase() === department.toLowerCase() && f.position
-      );
-      
-      if (departmentMarkers.length > 0) {
-        const bounds = L.latLngBounds(departmentMarkers.map(f => f.position));
-        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 11 });
-        return;
-      }
-    }
-    
-    // 2. Otherwise use the center and zoom provided
-    map.setView(center, zoom);
-  }, [center, zoom, department, formations, map]);
-  
-  return null;
-}
-
-function MarkerWithAutoPopup({ position, icon, children, timestamp }: any) {
-  const markerRef = useRef<L.Marker>(null);
-  
-  useEffect(() => {
-    if (timestamp && markerRef.current) {
-      markerRef.current.openPopup();
-    }
-  }, [timestamp]);
-  
-  return (
-    <Marker ref={markerRef} position={position} icon={icon}>
-      {children}
-    </Marker>
-  );
-}
+import { MapUpdater, MarkerWithAutoPopup } from './components/common/MapComponents';
+import { StatCard } from './components/common/StatCard';
 
 export default function App() {
   const [data, setData] = useState<OrientationData[]>([]);
@@ -543,6 +425,9 @@ export default function App() {
                 taux_acces: (row.taux_acces === "nd" || row.taux_acces === null || row.taux_acces === "") ? null : parseFloat(row.taux_acces),
                 note_moyenne: (row.note_moyenne === null || row.note_moyenne === "" || isNaN(Number(row.note_moyenne))) ? null : Number(row.note_moyenne),
                 selectivite: row.selectivite || "",
+                academie: row.academie || "",
+                pct_admis_neo_meme_acad: Number(row.pct_admis_neo_meme_acad || 0),
+                pct_admis_neo_meme_acad_idf: Number(row.pct_admis_neo_meme_acad_idf || 0),
                 pct_admis_neo_gen: Number(row["pct_admis_neo_gen"] || 0),
                 pct_admis_neo_techno: Number(row["pct_admis_neo_techno"] || 0),
                 pct_admis_neo_pro: Number(row["pct_admis_neo_pro"] || 0),
@@ -634,7 +519,12 @@ export default function App() {
       try {
         const parsed = JSON.parse(saved);
         if (parsed) {
-          handleOnboardingComplete(parsed);
+          const safeData = {
+            ...parsed,
+            targetFormationTypes: parsed.targetFormationTypes || [],
+            targetSubFormationTypes: parsed.targetSubFormationTypes || []
+          };
+          handleOnboardingComplete(safeData);
           setBacType('general');
         }
       } catch(e) {}
@@ -732,7 +622,7 @@ export default function App() {
     return mapSpecificData;
   }, [mapSpecificData]);
 
-  const mapFormations = useMemo(() => {
+  const baseMapFormations = useMemo(() => {
     let base = [...unfilteredMapFormations];
     
     if (geoFilter.formationTypes && geoFilter.formationTypes.length > 0) {
@@ -753,13 +643,6 @@ export default function App() {
       base = base.filter(f => f.departement.toLowerCase() === geoFilter.department.toLowerCase());
     }
 
-    // Filter by Potential
-    const userNote = filterAverage ? parseFloat(filterAverage) : (onboardingData ? parseFloat(onboardingData.averageBac) : null);
-    base = base.filter(f => {
-      const potential = getFormationPotential(f, userNote);
-      return selectedPotentialFilters.includes(potential);
-    });
-
     const mapped = base.map(f => {
       const coords = f.coordonnees_gps.split(',').map(c => parseFloat(c.trim()));
       return {
@@ -777,7 +660,16 @@ export default function App() {
     }
 
     return mapped;
-  }, [unfilteredMapFormations, geoFilter, selectedPotentialFilters, filterAverage, onboardingData]);
+  }, [unfilteredMapFormations, geoFilter]);
+
+  const mapFormations = useMemo(() => {
+    // Filter by Potential only for map display
+    const userNote = filterAverage ? parseFloat(filterAverage) : (onboardingData ? parseFloat(onboardingData.averageBac) : null);
+    return baseMapFormations.filter(f => {
+      const potential = getFormationPotential(f, userNote);
+      return selectedPotentialFilters.includes(potential);
+    });
+  }, [baseMapFormations, selectedPotentialFilters, filterAverage, onboardingData]);
 
   const groupedMapFormations = useMemo(() => {
     const groups = new Map<string, (Parcoursup2Data & { position: [number, number] })[]>();
@@ -1347,7 +1239,7 @@ export default function App() {
             >
               {onboardingData && (
                 <StatsPanel 
-                  data={mapFormations} 
+                  data={baseMapFormations} 
                   loading={loadingMap}
                   userNote={parseFloat(filterAverage)}
                   selectedDepartment={geoFilter.department || undefined}
@@ -1385,13 +1277,14 @@ export default function App() {
                               <div className="flex flex-wrap items-center gap-2">
                                 {(geoFilter.city || geoFilter.department || geoFilter.formationTypes.length > 0 || geoFilter.radius !== 1000) && (
                                   <button 
-                                    onClick={() => setGeoFilter({
+                                    onClick={() => setGeoFilter(prev => ({
+                                      ...prev,
                                       city: '',
                                       department: '',
                                       formationTypes: [],
-                                      radius: 1000,
-                                      center: geoFilter.center
-                                    })}
+                                      subFormationTypes: [],
+                                      radius: 1000
+                                    }))}
                                     className="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-200 transition-colors"
                                   >
                                     Réinitialiser filtres
@@ -1485,6 +1378,18 @@ export default function App() {
                                         <p className="text-xs font-medium text-primary-dark mb-1">{f.selectivite}</p>
                                         <p className="text-xs text-slate-500 mb-1">{f.commune} ({f.departement})</p>
                                         
+                                        {(() => {
+                                          if (!f.academie) return null;
+                                          const isIDF = f.academie === 'Paris' || f.academie === 'Créteil' || f.academie === 'Versailles';
+                                          if (isIDF) {
+                                            const val = f.pct_admis_neo_meme_acad_idf !== undefined && f.pct_admis_neo_meme_acad_idf !== null ? f.pct_admis_neo_meme_acad_idf : 0;
+                                            return <p className="text-xs text-slate-700 font-semibold mb-2">📍 {val}% des admis viennent d'Île-de-France.</p>;
+                                          } else {
+                                            const val = f.pct_admis_neo_meme_acad !== undefined && f.pct_admis_neo_meme_acad !== null ? f.pct_admis_neo_meme_acad : 0;
+                                            return <p className="text-xs text-slate-700 font-semibold mb-2">📍 {val}% des admis viennent de la même académie ({f.academie}).</p>;
+                                          }
+                                        })()}
+                                        
                                         <div className="flex items-center gap-1.5 mb-2.5">
                                           <span className="text-[10px] font-bold text-slate-400">Potentiel :</span>
                                           {(() => {
@@ -1560,7 +1465,7 @@ export default function App() {
                         {/* Legend and filter footer bar */}
                         {geoFilter.formationTypes.length > 0 && (
                           <div className="bg-slate-50 border-t border-slate-200 p-4 rounded-b-3xl flex flex-col lg:flex-row items-center justify-between gap-4">
-                            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full lg:w-auto">
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full lg:w-auto relative z-[60] pointer-events-auto">
                               <div className="flex items-center gap-2 text-slate-800 shrink-0">
                                 <Target className="w-5 h-5 text-primary" />
                                 <span className="text-xs font-black uppercase tracking-wider">Ton potentiel :</span>
@@ -1577,7 +1482,10 @@ export default function App() {
                                   return (
                                     <button
                                       key={item.id}
-                                      onClick={() => {
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
                                         setSelectedPotentialFilters(prev => 
                                           prev.includes(item.id) 
                                             ? prev.filter(id => id !== item.id) 
@@ -1585,10 +1493,10 @@ export default function App() {
                                         );
                                       }}
                                       className={cn(
-                                        "flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all hover:bg-white shadow-xs",
+                                        "flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all shadow-xs cursor-pointer pointer-events-auto",
                                         isSelected 
-                                          ? "border-slate-200 bg-white text-slate-700" 
-                                          : "border-transparent bg-slate-100 text-slate-400 opacity-50 hover:opacity-100"
+                                          ? "border-slate-200 bg-white text-slate-700 opacity-100" 
+                                          : "border-transparent bg-slate-100 text-slate-400 opacity-60 hover:opacity-100 hover:bg-slate-200"
                                       )}
                                       title={item.desc}
                                     >
@@ -1657,37 +1565,6 @@ export default function App() {
           </div>
         </div>
       </footer>
-    </div>
-  );
-}
-
-interface StatCardProps {
-  title: string;
-  value: string;
-  icon: React.ReactNode;
-  description: string;
-  color: 'blue' | 'emerald' | 'primary';
-}
-
-function StatCard({ title, value, icon, description, color }: StatCardProps) {
-  const colorClasses = {
-    blue: "bg-blue-50 border-blue-100",
-    emerald: "bg-emerald-50 border-emerald-100",
-    primary: "bg-primary-light border-primary/10"
-  };
-
-  return (
-    <div className={cn("p-6 rounded-3xl border shadow-sm transition-all hover:shadow-md", colorClasses[color])}>
-      <div className="flex items-start justify-between mb-4">
-        <div className="p-3 bg-white rounded-2xl shadow-sm">
-          {icon}
-        </div>
-      </div>
-      <h4 className="text-slate-500 text-sm font-medium mb-1">{title}</h4>
-      <div className="text-3xl font-extrabold text-slate-900 mb-2">{value}</div>
-      {description && (
-        <p className="text-slate-500 text-xs leading-relaxed">{description}</p>
-      )}
     </div>
   );
 }

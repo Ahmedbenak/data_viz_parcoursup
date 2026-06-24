@@ -37,14 +37,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { AnimatePresence } from 'motion/react';
-
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
-
-// Utility for tailwind classes
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
+import { cn } from '../lib/utils';
 
 ChartJS.register(
   CategoryScale,
@@ -58,35 +51,7 @@ ChartJS.register(
   Legend
 );
 
-interface Parcoursup2Data {
-  filiere_generale: string;
-  filiere_formation: string;
-  filiere_detaillee?: string;
-  etablissement: string;
-  commune: string;
-  departement: string;
-  region: string;
-  coordonnees_gps: string;
-  eff_admis: number;
-  eff_admis_neo?: number;
-  capacite: number;
-  taux_acces: number | null;
-  note_moyenne: number | null;
-  selectivite: string;
-  pct_admis_neo_gen?: number;
-  pct_admis_neo_techno?: number;
-  pct_admis_neo_pro?: number;
-  lien_parcoursup?: string;
-  pct_boursiers?: number;
-  pct_admis_neo_boursiers?: number;
-  eff_admis_boursiers_neo?: number;
-  pct_admises_filles?: number;
-  pct_admis_neo_sans_mention?: number;
-  pct_admis_neo_mention_ab?: number;
-  pct_admis_neo_mention_b?: number;
-  pct_admis_neo_mention_tb?: number;
-  pct_admis_neo_mention_tbf?: number;
-}
+import { Parcoursup2Data } from '../types';
 
 interface StatsPanelProps {
   data: Parcoursup2Data[];
@@ -575,6 +540,18 @@ export default function StatsPanel({
                               <MapPin className="w-3 h-3" />
                               {item.commune} ({item.departement})
                             </div>
+                            
+                            {(() => {
+                              if (!item.academie) return null;
+                              const isIDF = item.academie === 'Paris' || item.academie === 'Créteil' || item.academie === 'Versailles';
+                              if (isIDF) {
+                                const val = item.pct_admis_neo_meme_acad_idf !== undefined && item.pct_admis_neo_meme_acad_idf !== null ? item.pct_admis_neo_meme_acad_idf : 0;
+                                return <p className="text-sm text-slate-700 font-medium mb-4 italic">📍 {val}% des admis viennent d'Île-de-France.</p>;
+                              } else {
+                                const val = item.pct_admis_neo_meme_acad !== undefined && item.pct_admis_neo_meme_acad !== null ? item.pct_admis_neo_meme_acad : 0;
+                                return <p className="text-sm text-slate-700 font-medium mb-4 italic">📍 {val}% des admis viennent de la même académie ({item.academie}).</p>;
+                              }
+                            })()}
                           </div>
                           
                           <div className="flex items-center justify-between pt-4 border-t border-slate-200/50">

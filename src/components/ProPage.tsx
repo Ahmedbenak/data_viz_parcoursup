@@ -105,85 +105,8 @@ const createMarkerIcon = (colors: string[], count: number) => {
   }
 };
 
-function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
-  const R = 6371; // Radius of the earth in km
-  const dLat = deg2rad(lat2 - lat1);
-  const dLon = deg2rad(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const d = R * c; // Distance in km
-  return d;
-}
-
-function deg2rad(deg: number) {
-  return deg * (Math.PI / 180);
-}
-
-const getFormationPotential = (f: any, userNote: number | null): 'secure' | 'realiste' | 'ambitieux' | 'sans_note' => {
-  if (userNote === null || userNote === 0 || isNaN(userNote) || f.note_moyenne === null || isNaN(f.note_moyenne)) {
-    return 'sans_note';
-  }
-  if (f.note_moyenne <= userNote - 0.5) {
-    return 'secure';
-  }
-  if (f.note_moyenne > userNote - 0.5 && f.note_moyenne <= userNote + 0.5) {
-    return 'realiste';
-  }
-  return 'ambitieux';
-};
-
-const getPotentialColor = (potential: string) => {
-  switch (potential) {
-    case 'secure': return '#10b981'; // emerald-500
-    case 'realiste': return '#fbbf24'; // amber-400
-    case 'ambitieux': return '#f43f5e'; // rose-500
-    default: return '#94a3b8'; // slate-400
-  }
-};
-
-function MapUpdater({ center, zoom, department, formations }: { center: [number, number], zoom: number, department?: string, formations: any[] }) {
-  const map = useMap();
-  
-  useEffect(() => {
-    // 1. If we have a specific department, focus on it
-    if (department && department.toLowerCase() !== 'toute la france' && formations.length > 0 && center[0] === 46.603354) {
-      const departmentMarkers = formations.filter(f => 
-        f.departement.toLowerCase() === department.toLowerCase() && f.position
-      );
-      
-      if (departmentMarkers.length > 0) {
-        const bounds = L.latLngBounds(departmentMarkers.map(f => f.position));
-        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 11 });
-        return;
-      }
-    }
-    
-    // 2. Otherwise use the center and zoom provided
-    map.setView(center, zoom);
-  }, [center, zoom, department, formations, map]);
-  
-  return null;
-}
-
-function MarkerWithAutoPopup({ position, icon, children, timestamp }: any) {
-  const markerRef = useRef<L.Marker>(null);
-  
-  useEffect(() => {
-    if (timestamp && markerRef.current) {
-      markerRef.current.openPopup();
-    }
-  }, [timestamp]);
-  
-  return (
-    <Marker ref={markerRef} position={position} icon={icon}>
-      {children}
-    </Marker>
-  );
-}
-
+import { getFormationPotential, getPotentialColor, getDistance, deg2rad } from '../lib/utils';
+import { MapUpdater, MarkerWithAutoPopup } from './common/MapComponents';
 import { Skeleton, CardSkeleton } from './Skeleton';
 import Header from './Header';
 
@@ -265,18 +188,24 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        setProOnboardingData(parsed);
-        setQBacProSearch(parsed.bacPro);
-        setQDeptSearch(parsed.department);
+        
+        const safeData = {
+          ...parsed,
+          targetSubFormationTypes: parsed.targetSubFormationTypes || []
+        };
+        
+        setProOnboardingData(safeData);
+        setQBacProSearch(safeData.bacPro);
+        setQDeptSearch(safeData.department);
         
         // Pre-select and set state directly
-        setSelectedBacPro(parsed.bacPro);
-        setProUserNote(parsed.averageBac);
+        setSelectedBacPro(safeData.bacPro);
+        setProUserNote(safeData.averageBac);
         setGeoFilter(prev => ({
           ...prev,
-          department: parsed.department,
-          formationTypes: parsed.targetFormation ? [parsed.targetFormation] : prev.formationTypes,
-          subFormationTypes: parsed.targetSubFormationTypes || prev.subFormationTypes
+          department: safeData.department,
+          formationTypes: safeData.targetFormation ? [safeData.targetFormation] : prev.formationTypes,
+          subFormationTypes: safeData.targetSubFormationTypes || prev.subFormationTypes
         }));
         setShowProOnboarding(false);
       } catch (e) {
@@ -542,6 +471,9 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
               taux_acces: (row.taux_acces === "nd" || row.taux_acces === null || row.taux_acces === "") ? null : parseFloat(row.taux_acces),
               note_moyenne: (row.note_moyenne === null || row.note_moyenne === "" || isNaN(Number(row.note_moyenne))) ? null : Number(row.note_moyenne),
               selectivite: row.selectivite || "",
+              academie: row.academie || "",
+              pct_admis_neo_meme_acad: Number(row.pct_admis_neo_meme_acad || 0),
+              pct_admis_neo_meme_acad_idf: Number(row.pct_admis_neo_meme_acad_idf || 0),
               pct_admis_neo_gen: Number(row["pct_admis_neo_gen"] || 0),
               pct_admis_neo_techno: Number(row["pct_admis_neo_techno"] || 0),
               pct_admis_neo_pro: Number(row["pct_admis_neo_pro"] || 0),
@@ -568,7 +500,7 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
     loadMapData();
   }, [geoFilter.formationTypes, geoFilter.subFormationTypes]);
 
-  const filteredMapData = useMemo(() => {
+  const baseFilteredMapData = useMemo(() => {
     let base = [...mapData];
     
     if (geoFilter.formationTypes && geoFilter.formationTypes.length > 0) {
@@ -594,15 +526,17 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
       });
     }
 
+    return base;
+  }, [mapData, geoFilter]);
+
+  const filteredMapData = useMemo(() => {
     // Filter by Potential
     const userNote = proUserNote ? parseFloat(proUserNote) : (onboardingData ? parseFloat(onboardingData.averageBac) : null);
-    base = base.filter(f => {
+    return baseFilteredMapData.filter(f => {
       const potential = getFormationPotential(f, userNote);
       return selectedPotentialFilters.includes(potential);
     });
-
-    return base;
-  }, [mapData, geoFilter, selectedPotentialFilters, proUserNote, onboardingData]);
+  }, [baseFilteredMapData, selectedPotentialFilters, proUserNote, onboardingData]);
 
   const groupedMapData = useMemo(() => {
     const groups = new Map<string, any[]>();
@@ -983,6 +917,7 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
                       setProOnboardingData({
                         bacPro: selectedBacPro,
                         targetFormation: geoFilter.formationTypes[0] || '',
+                        targetSubFormationTypes: geoFilter.subFormationTypes || [],
                         averageBac: proUserNote || (onboardingData?.averageBac || ''),
                         department: geoFilter.department
                       });
@@ -1277,7 +1212,7 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
 
         {/* Stats Panel Section */}
         <StatsPanel 
-          data={filteredMapData} 
+          data={baseFilteredMapData} 
           userNote={proUserNote ? parseFloat(proUserNote) : (onboardingData ? parseFloat(onboardingData.averageBac) : null)}
           selectedDepartment={geoFilter.department || undefined}
           selectedCity={geoFilter.city || undefined}
@@ -1314,13 +1249,14 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
                     <div className="flex flex-wrap items-center gap-2">
                       {(geoFilter.city || geoFilter.department || geoFilter.formationTypes.length > 0 || geoFilter.radius !== 1000) && (
                         <button 
-                          onClick={() => setGeoFilter({
+                          onClick={() => setGeoFilter(prev => ({
+                            ...prev,
                             city: '',
                             department: '',
                             formationTypes: [],
-                            radius: 1000,
-                            center: geoFilter.center
-                          })}
+                            subFormationTypes: [],
+                            radius: 1000
+                          }))}
                           className="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-200 transition-colors"
                         >
                           Réinitialiser filtres
@@ -1414,6 +1350,18 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
                                 <p className="text-xs font-medium text-primary-dark mb-1">{f.selectivite}</p>
                                 <p className="text-xs text-slate-500 mb-1">{f.commune} ({f.departement})</p>
                                 
+                                {(() => {
+                                  if (!f.academie) return null;
+                                  const isIDF = f.academie === 'Paris' || f.academie === 'Créteil' || f.academie === 'Versailles';
+                                  if (isIDF) {
+                                    const val = f.pct_admis_neo_meme_acad_idf !== undefined && f.pct_admis_neo_meme_acad_idf !== null ? f.pct_admis_neo_meme_acad_idf : 0;
+                                    return <p className="text-xs text-slate-700 font-semibold mb-2">📍 {val}% des admis viennent d'Île-de-France.</p>;
+                                  } else {
+                                    const val = f.pct_admis_neo_meme_acad !== undefined && f.pct_admis_neo_meme_acad !== null ? f.pct_admis_neo_meme_acad : 0;
+                                    return <p className="text-xs text-slate-700 font-semibold mb-2">📍 {val}% des admis viennent de la même académie ({f.academie}).</p>;
+                                  }
+                                })()}
+                                
                                 <div className="flex items-center gap-1.5 mb-2.5">
                                   <span className="text-[10px] font-bold text-slate-400">Potentiel :</span>
                                   {(() => {
@@ -1492,7 +1440,7 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
                 {/* Legend and filter footer bar */}
                 {geoFilter.formationTypes.length > 0 && (
                   <div className="bg-slate-50 border-t border-slate-200 p-4 rounded-b-3xl flex flex-col lg:flex-row items-center justify-between gap-4">
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full lg:w-auto">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full lg:w-auto relative z-[60] pointer-events-auto">
                       <div className="flex items-center gap-2 text-slate-800 shrink-0">
                         <Target className="w-5 h-5 text-primary" />
                         <span className="text-xs font-black uppercase tracking-wider">Ton potentiel :</span>
@@ -1509,7 +1457,10 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
                           return (
                             <button
                               key={item.id}
-                              onClick={() => {
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
                                 setSelectedPotentialFilters(prev => 
                                   prev.includes(item.id) 
                                     ? prev.filter(id => id !== item.id) 
@@ -1517,10 +1468,10 @@ export default function ProPage({ onBack, onboardingData, setOnboardingComplete 
                                 );
                               }}
                               className={cn(
-                                "flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all hover:bg-white shadow-xs",
+                                "flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all shadow-xs cursor-pointer pointer-events-auto",
                                 isSelected 
-                                  ? "border-slate-200 bg-white text-slate-700" 
-                                  : "border-transparent bg-slate-100 text-slate-400 opacity-50 hover:opacity-100"
+                                  ? "border-slate-200 bg-white text-slate-700 opacity-100" 
+                                  : "border-transparent bg-slate-100 text-slate-400 opacity-60 hover:opacity-100 hover:bg-slate-200"
                               )}
                               title={item.desc}
                             >

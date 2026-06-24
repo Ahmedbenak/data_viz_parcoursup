@@ -1,42 +1,6 @@
 import React from 'react';
 import { Users, CheckCircle, TrendingUp } from 'lucide-react';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
-
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
-
-interface StatCardProps {
-  title: string;
-  value: string;
-  icon: React.ReactNode;
-  description: string;
-  color: 'blue' | 'emerald' | 'indigo';
-}
-
-function StatCard({ title, value, icon, description, color }: StatCardProps) {
-  const colorClasses = {
-    blue: "bg-blue-50/50 border-blue-100",
-    emerald: "bg-emerald-50/50 border-emerald-100",
-    indigo: "bg-indigo-50/50 border-indigo-100"
-  };
-
-  return (
-    <div className={cn("p-8 rounded-[2rem] border shadow-sm transition-all hover:shadow-xl hover:-translate-y-1 group", colorClasses[color])}>
-      <div className="flex items-start justify-between mb-6">
-        <div className="p-4 bg-white rounded-2xl shadow-sm group-hover:shadow-md transition-all">
-          {icon}
-        </div>
-      </div>
-      <h4 className="text-slate-500 text-sm font-bold uppercase tracking-wider mb-2">{title}</h4>
-      <div className="text-4xl font-black text-slate-900 mb-3 tracking-tight">{value}</div>
-      {description && (
-        <p className="text-slate-500 text-sm leading-relaxed font-medium">{description}</p>
-      )}
-    </div>
-  );
-}
+import { StatCard } from '../common/StatCard';
 
 interface StatsGridProps {
   stats: {
