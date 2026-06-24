@@ -1340,270 +1340,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* Phase 3: Cartographie (Moved up) */}
-            <div 
-              id="section-phase-3"
-              className="scroll-mt-32 transition-all duration-500 relative"
-            >
-              <div className="bg-white rounded-3xl border border-slate-200 shadow-sm">
-                <div className="p-6 border-b border-slate-100">
-                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 bg-primary-light rounded-2xl flex items-center justify-center">
-                        <MapPin className="w-6 h-6 text-primary" />
-                      </div>
-                      <div>
-                        <h3 className="text-xl font-bold text-slate-900">Cartographie de la formation en France</h3>
-                        <p className="text-sm text-slate-500">
-                          {mapFormations.length > 0 
-                            ? `${mapFormations.length} établissement${mapFormations.length > 1 ? 's' : ''} trouvé${mapFormations.length > 1 ? 's' : ''}`
-                            : "Explore les établissements par zone géographique"
-                          }
-                        </p>
-                      </div>
-                    </div>
-
-                      <div className="flex flex-wrap items-center gap-2">
-                        {(geoFilter.city || geoFilter.department || geoFilter.formationTypes.length > 0 || geoFilter.radius !== 1000) && (
-                          <button 
-                            onClick={() => setGeoFilter({
-                              city: '',
-                              department: '',
-                              formationTypes: [],
-                              radius: 1000,
-                              center: geoFilter.center
-                            })}
-                            className="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-200 transition-colors"
-                          >
-                            Réinitialiser filtres
-                          </button>
-                        )}
-                      <div className="h-8 w-px bg-slate-200 hidden lg:block mx-2" />
-                      <button 
-                        onClick={handleLocateUser}
-                        className="px-4 py-2 bg-primary-light text-primary rounded-xl font-bold text-sm hover:bg-primary hover:text-white transition-all flex items-center gap-2"
-                      >
-                        <Target className="w-4 h-4" />
-                        Ma position
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="h-[480px] w-full relative z-0 overflow-hidden">
-                  {geoFilter.formationTypes.length === 0 ? (
-                    <div className="absolute inset-0 z-10 bg-slate-900/5 backdrop-blur-[2px] flex items-center justify-center p-6 text-center">
-                      <div className="bg-white p-8 rounded-3xl shadow-xl border border-slate-100 max-w-sm">
-                        <div className="w-16 h-16 bg-primary-light rounded-2xl flex items-center justify-center mx-auto mb-4">
-                          <Search className="w-8 h-8 text-primary" />
-                        </div>
-                        <h4 className="text-lg font-bold text-slate-900 mb-2">Prêt à explorer ?</h4>
-                        <p className="text-sm text-slate-500 mb-6">
-                          Sélectionne un ou plusieurs types de formation dans le filtre ci-dessous pour les voir sur la carte.
-                        </p>
-                        <div className="flex flex-col gap-2">
-                          <button 
-                            onClick={() => setShowFormationSuggestions(true)}
-                            className="w-full py-2.5 bg-primary text-white rounded-xl font-bold text-sm hover:bg-primary-dark transition-colors"
-                          >
-                            Choisir des formations
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ) : null}
-
-                  <MapContainer 
-                    center={geoFilter.center} 
-                    zoom={6} 
-                    style={{ height: '100%', width: '100%' }}
-                    scrollWheelZoom={false}
-                  >
-                    <MapUpdater 
-                      center={geoFilter.center} 
-                      zoom={geoFilter.zoom}
-                      department={geoFilter.department} 
-                      formations={mapFormations} 
-                    />
-                    <TileLayer
-                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    />
-                    {groupedMapFormations.map((group, idx) => {
-                      const targeted = targetFormation && group.formations.some(f => 
-                        f.etablissement === targetFormation.data.etablissement && 
-                        f.filiere_formation === targetFormation.data.filiere_formation &&
-                        f.coordonnees_gps === targetFormation.data.coordonnees_gps
-                      );
-
-                      const popupUserNote = filterAverage ? parseFloat(filterAverage) : (onboardingData ? parseFloat(onboardingData.averageBac) : null);
-
-                      return (
-                        <MarkerWithAutoPopup 
-                          key={idx} 
-                          position={group.position}
-                          icon={createMarkerIcon(group.colors, group.formations.length)}
-                          timestamp={targeted ? targetFormation.timestamp : null}
-                        >
-                          <Popup minWidth={250} maxWidth={320}>
-                          <div className="max-h-[350px] overflow-y-auto pr-1 custom-scrollbar">
-                            {group.formations.map((f, fIdx) => (
-                              <div key={fIdx} className={cn("p-1", fIdx > 0 && "mt-4 pt-4 border-t border-slate-200")}>
-                                {group.formations.length > 1 && (
-                                  <div className="flex items-center justify-between mb-2">
-                                    <span className="px-1.5 py-0.5 bg-primary-light text-primary text-[9px] font-bold rounded uppercase">
-                                      Formation {fIdx + 1}/{group.formations.length}
-                                    </span>
-                                    <span className="text-[9px] text-slate-400 font-bold uppercase">ID: {f.etablissement.slice(0,3)}...</span>
-                                  </div>
-                                )}
-                                <div className="flex items-start gap-2 mb-1">
-                                  <div className="w-2 h-2 rounded-full mt-1.5 shrink-0" style={{ backgroundColor: getFormationColor(f.filiere_generale) }} />
-                                  <h4 className="font-bold text-slate-900 text-sm">{f.etablissement}</h4>
-                                </div>
-                                <p className="text-xs text-slate-500 mb-1 leading-relaxed">{f.filiere_formation}</p>
-                                {f.filiere_detaillee && <p className="text-[10px] italic text-primary font-medium mb-1">{f.filiere_detaillee}</p>}
-                                <p className="text-xs font-medium text-primary-dark mb-1">{f.selectivite}</p>
-                                <p className="text-xs text-slate-500 mb-1">{f.commune} ({f.departement})</p>
-                                
-                                <div className="flex items-center gap-1.5 mb-2.5">
-                                  <span className="text-[10px] font-bold text-slate-400">Potentiel :</span>
-                                  {(() => {
-                                    const potential = getFormationPotential(f, popupUserNote);
-                                    let badgeColor = "bg-slate-100 text-slate-600 border-slate-200";
-                                    let label = "Non classé";
-                                    if (potential === 'secure') {
-                                      badgeColor = "bg-emerald-50 text-emerald-700 border-emerald-200";
-                                      label = "Sécure";
-                                    } else if (potential === 'realiste') {
-                                      badgeColor = "bg-amber-50 text-amber-700 border-amber-200";
-                                      label = "Réaliste";
-                                    } else if (potential === 'ambitieux') {
-                                      badgeColor = "bg-rose-50 text-rose-700 border-rose-200";
-                                      label = "Ambitieux";
-                                    }
-                                    return (
-                                      <span className={cn("px-1.5 py-0.5 rounded-md border text-[9px] font-black uppercase tracking-wider", badgeColor)}>
-                                        {label}
-                                      </span>
-                                    );
-                                  })()}
-                                </div>
-                                
-                                <div className="grid grid-cols-2 gap-2">
-                                  <div className="bg-slate-50 p-2 rounded-lg">
-                                    <span className="block text-[10px] text-slate-400 uppercase font-bold">Taux Accès</span>
-                                    <span className="text-sm font-bold text-primary">
-                                      {f.taux_acces !== null ? `${f.taux_acces}%` : "Inconnu"}
-                                    </span>
-                                  </div>
-                                  <div className="bg-slate-50 p-2 rounded-lg">
-                                    <span className="block text-[10px] text-slate-400 uppercase font-bold">Capacité</span>
-                                    <span className="text-sm font-bold text-slate-700">{f.capacite}</span>
-                                  </div>
-                                </div>
-                                
-                                <div className="mt-2 pt-2 border-t border-slate-100 flex flex-col gap-2">
-                                  <span className="text-[10px] text-slate-400 font-medium italic leading-tight block">
-                                    Note moyenne au bac pour les admis: {f.note_moyenne !== null ? `${f.note_moyenne.toFixed(1)}/20` : "N/A"}
-                                  </span>
-                                  <span className="text-[10px] text-emerald-600 font-bold block">
-                                    Part de boursiers: {f.pct_admis_neo_boursiers !== undefined ? `${f.pct_admis_neo_boursiers}%` : "N/A"}
-                                  </span>
-                                  {f.lien_parcoursup && (
-                                    <a 
-                                      href={f.lien_parcoursup} 
-                                      target="_blank" 
-                                      rel="noopener noreferrer"
-                                      className="text-[10px] font-black text-primary hover:underline flex items-center gap-1 uppercase tracking-wider"
-                                    >
-                                      Voir sur Parcoursup <ArrowRight className="w-3 h-3" />
-                                    </a>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </Popup>
-                        </MarkerWithAutoPopup>
-                      );
-                    })}
-                    {geoFilter.radius < 1000 && (
-                      <Circle 
-                        center={geoFilter.center} 
-                        radius={geoFilter.radius * 1000} 
-                        pathOptions={{ color: '#e30613', fillColor: '#e30613', fillOpacity: 0.1 }} 
-                      />
-                    )}
-                  </MapContainer>
-                </div>
-
-                {/* Legend and filter footer bar */}
-                {geoFilter.formationTypes.length > 0 && (
-                  <div className="bg-slate-50 border-t border-slate-200 p-4 rounded-b-3xl flex flex-col lg:flex-row items-center justify-between gap-4">
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full lg:w-auto">
-                      <div className="flex items-center gap-2 text-slate-800 shrink-0">
-                        <Target className="w-5 h-5 text-primary" />
-                        <span className="text-xs font-black uppercase tracking-wider">Ton potentiel :</span>
-                      </div>
-                      
-                      <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-                        {[
-                          { id: 'secure', label: 'Sécure', color: 'bg-emerald-500', desc: 'Note supérieure aux admis' },
-                          { id: 'realiste', label: 'Réaliste', color: 'bg-amber-400', desc: 'Profil type' },
-                          { id: 'ambitieux', label: 'Ambitieux', color: 'bg-rose-500', desc: 'Un peu juste' },
-                          { id: 'sans_note', label: 'Sans note / Non classé', color: 'bg-slate-400', desc: 'Aucun seuil défini' }
-                        ].map((item) => {
-                          const isSelected = selectedPotentialFilters.includes(item.id);
-                          return (
-                            <button
-                              key={item.id}
-                              onClick={() => {
-                                setSelectedPotentialFilters(prev => 
-                                  prev.includes(item.id) 
-                                    ? prev.filter(id => id !== item.id) 
-                                    : [...prev, item.id]
-                                );
-                              }}
-                              className={cn(
-                                "flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all hover:bg-white shadow-xs",
-                                isSelected 
-                                  ? "border-slate-200 bg-white text-slate-700" 
-                                  : "border-transparent bg-slate-100 text-slate-400 opacity-50 hover:opacity-100"
-                              )}
-                              title={item.desc}
-                            >
-                              <div className={cn("w-2.5 h-2.5 rounded-full shrink-0", item.color)} />
-                              <span>{item.label}</span>
-                              {item.id === 'sans_note' && !filterAverage && (
-                                <span className="text-[8px] font-black uppercase tracking-wider text-amber-600 bg-amber-50 px-1 rounded ml-1">Actif</span>
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3 w-full lg:w-auto border-t lg:border-t-0 pt-3 lg:pt-0 border-slate-200">
-                      <span className="text-xs font-bold text-slate-500 shrink-0">Ta moyenne :</span>
-                      <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-sm w-full sm:w-auto">
-                        <input 
-                          type="text" 
-                          inputMode="decimal"
-                          placeholder="Moyenne"
-                          value={filterAverage}
-                          onChange={(e) => setFilterAverage(e.target.value)}
-                          className="w-16 text-center font-black text-slate-800 placeholder-slate-400 focus:outline-none text-xs"
-                        />
-                        <span className="text-xs font-bold text-slate-400 shrink-0">/ 20</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Phase 2: Comparisons (Moved down) */}
+            {/* Phase 2: Comparisons */}
             <div 
               id="section-phase-2"
               className="scroll-mt-32 transition-all duration-500 relative"
@@ -1625,6 +1362,266 @@ export default function App() {
                   onFilterChange={(filters) => setGeoFilter(prev => ({ ...prev, ...filters }))}
                   onShowOnMap={handleShowOnMap}
                   pageType="general"
+                  mapComponent={
+                    <div id="section-phase-3" className="scroll-mt-32 transition-all duration-500 relative">
+                      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm">
+                        <div className="p-6 border-b border-slate-100">
+                          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                            <div className="flex items-center gap-3">
+                              <div className="w-12 h-12 bg-primary-light rounded-2xl flex items-center justify-center">
+                                <MapPin className="w-6 h-6 text-primary" />
+                              </div>
+                              <div>
+                                <h3 className="text-xl font-bold text-slate-900">Cartographie de la formation en France</h3>
+                                <p className="text-sm text-slate-500">
+                                  {mapFormations.length > 0 
+                                    ? `${mapFormations.length} établissement${mapFormations.length > 1 ? 's' : ''} trouvé${mapFormations.length > 1 ? 's' : ''}`
+                                    : "Explore les établissements par zone géographique"
+                                  }
+                                </p>
+                              </div>
+                            </div>
+
+                              <div className="flex flex-wrap items-center gap-2">
+                                {(geoFilter.city || geoFilter.department || geoFilter.formationTypes.length > 0 || geoFilter.radius !== 1000) && (
+                                  <button 
+                                    onClick={() => setGeoFilter({
+                                      city: '',
+                                      department: '',
+                                      formationTypes: [],
+                                      radius: 1000,
+                                      center: geoFilter.center
+                                    })}
+                                    className="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-200 transition-colors"
+                                  >
+                                    Réinitialiser filtres
+                                  </button>
+                                )}
+                              <div className="h-8 w-px bg-slate-200 hidden lg:block mx-2" />
+                              <button 
+                                onClick={handleLocateUser}
+                                className="px-4 py-2 bg-primary-light text-primary rounded-xl font-bold text-sm hover:bg-primary hover:text-white transition-all flex items-center gap-2"
+                              >
+                                <Target className="w-4 h-4" />
+                                Ma position
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="h-[480px] w-full relative z-0 overflow-hidden">
+                          {geoFilter.formationTypes.length === 0 ? (
+                            <div className="absolute inset-0 z-10 bg-slate-900/5 backdrop-blur-[2px] flex items-center justify-center p-6 text-center">
+                              <div className="bg-white p-8 rounded-3xl shadow-xl border border-slate-100 max-w-sm">
+                                <div className="w-16 h-16 bg-primary-light rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                  <Search className="w-8 h-8 text-primary" />
+                                </div>
+                                <h4 className="text-lg font-bold text-slate-900 mb-2">Prêt à explorer ?</h4>
+                                <p className="text-sm text-slate-500 mb-6">
+                                  Sélectionne un ou plusieurs types de formation dans le filtre ci-dessous pour les voir sur la carte.
+                                </p>
+                                <div className="flex flex-col gap-2">
+                                  <button 
+                                    onClick={() => setShowFormationSuggestions(true)}
+                                    className="w-full py-2.5 bg-primary text-white rounded-xl font-bold text-sm hover:bg-primary-dark transition-colors"
+                                  >
+                                    Choisir des formations
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ) : null}
+
+                          <MapContainer 
+                            center={geoFilter.center} 
+                            zoom={6} 
+                            style={{ height: '100%', width: '100%' }}
+                            scrollWheelZoom={false}
+                          >
+                            <MapUpdater 
+                              center={geoFilter.center} 
+                              zoom={geoFilter.zoom}
+                              department={geoFilter.department} 
+                              formations={mapFormations} 
+                            />
+                            <TileLayer
+                              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                            />
+                            {groupedMapFormations.map((group, idx) => {
+                              const targeted = targetFormation && group.formations.some(f => 
+                                f.etablissement === targetFormation.data.etablissement && 
+                                f.filiere_formation === targetFormation.data.filiere_formation &&
+                                f.coordonnees_gps === targetFormation.data.coordonnees_gps
+                              );
+
+                              const popupUserNote = filterAverage ? parseFloat(filterAverage) : (onboardingData ? parseFloat(onboardingData.averageBac) : null);
+
+                              return (
+                                <MarkerWithAutoPopup 
+                                  key={idx} 
+                                  position={group.position}
+                                  icon={createMarkerIcon(group.colors, group.formations.length)}
+                                  timestamp={targeted ? targetFormation.timestamp : null}
+                                >
+                                  <Popup minWidth={250} maxWidth={320}>
+                                  <div className="max-h-[350px] overflow-y-auto pr-1 custom-scrollbar">
+                                    {group.formations.map((f, fIdx) => (
+                                      <div key={fIdx} className={cn("p-1", fIdx > 0 && "mt-4 pt-4 border-t border-slate-200")}>
+                                        {group.formations.length > 1 && (
+                                          <div className="flex items-center justify-between mb-2">
+                                            <span className="px-1.5 py-0.5 bg-primary-light text-primary text-[9px] font-bold rounded uppercase">
+                                              Formation {fIdx + 1}/{group.formations.length}
+                                            </span>
+                                            <span className="text-[9px] text-slate-400 font-bold uppercase">ID: {f.etablissement.slice(0,3)}...</span>
+                                          </div>
+                                        )}
+                                        <div className="flex items-start gap-2 mb-1">
+                                          <div className="w-2 h-2 rounded-full mt-1.5 shrink-0" style={{ backgroundColor: getFormationColor(f.filiere_generale) }} />
+                                          <h4 className="font-bold text-slate-900 text-sm">{f.etablissement}</h4>
+                                        </div>
+                                        <p className="text-xs text-slate-500 mb-1 leading-relaxed">{f.filiere_formation}</p>
+                                        {f.filiere_detaillee && <p className="text-[10px] italic text-primary font-medium mb-1">{f.filiere_detaillee}</p>}
+                                        <p className="text-xs font-medium text-primary-dark mb-1">{f.selectivite}</p>
+                                        <p className="text-xs text-slate-500 mb-1">{f.commune} ({f.departement})</p>
+                                        
+                                        <div className="flex items-center gap-1.5 mb-2.5">
+                                          <span className="text-[10px] font-bold text-slate-400">Potentiel :</span>
+                                          {(() => {
+                                            const potential = getFormationPotential(f, popupUserNote);
+                                            let badgeColor = "bg-slate-100 text-slate-600 border-slate-200";
+                                            let label = "Non classé";
+                                            if (potential === 'secure') {
+                                              badgeColor = "bg-emerald-50 text-emerald-700 border-emerald-200";
+                                              label = "Sécure";
+                                            } else if (potential === 'realiste') {
+                                              badgeColor = "bg-amber-50 text-amber-700 border-amber-200";
+                                              label = "Réaliste";
+                                            } else if (potential === 'ambitieux') {
+                                              badgeColor = "bg-rose-50 text-rose-700 border-rose-200";
+                                              label = "Ambitieux";
+                                            }
+                                            return (
+                                              <span className={cn("px-1.5 py-0.5 rounded-md border text-[9px] font-black uppercase tracking-wider", badgeColor)}>
+                                                {label}
+                                              </span>
+                                            );
+                                          })()}
+                                        </div>
+                                        
+                                        <div className="grid grid-cols-2 gap-2">
+                                          <div className="bg-slate-50 p-2 rounded-lg">
+                                            <span className="block text-[10px] text-slate-400 uppercase font-bold">Taux Accès</span>
+                                            <span className="text-sm font-bold text-primary">
+                                              {f.taux_acces !== null ? `${f.taux_acces}%` : "Inconnu"}
+                                            </span>
+                                          </div>
+                                          <div className="bg-slate-50 p-2 rounded-lg">
+                                            <span className="block text-[10px] text-slate-400 uppercase font-bold">Capacité</span>
+                                            <span className="text-sm font-bold text-slate-700">{f.capacite}</span>
+                                          </div>
+                                        </div>
+                                        
+                                        <div className="mt-2 pt-2 border-t border-slate-100 flex flex-col gap-2">
+                                          <span className="text-[10px] text-slate-400 font-medium italic leading-tight block">
+                                            Note moyenne au bac pour les admis: {f.note_moyenne !== null ? `${f.note_moyenne.toFixed(1)}/20` : "N/A"}
+                                          </span>
+                                          <span className="text-[10px] text-emerald-600 font-bold block">
+                                            Part de boursiers: {f.pct_admis_neo_boursiers !== undefined ? `${f.pct_admis_neo_boursiers}%` : "N/A"}
+                                          </span>
+                                          {f.lien_parcoursup && (
+                                            <a 
+                                              href={f.lien_parcoursup} 
+                                              target="_blank" 
+                                              rel="noopener noreferrer"
+                                              className="text-[10px] font-black text-primary hover:underline flex items-center gap-1 uppercase tracking-wider"
+                                            >
+                                              Voir sur Parcoursup <ArrowRight className="w-3 h-3" />
+                                            </a>
+                                          )}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </Popup>
+                                </MarkerWithAutoPopup>
+                              );
+                            })}
+                            {geoFilter.radius < 1000 && (
+                              <Circle 
+                                center={geoFilter.center} 
+                                radius={geoFilter.radius * 1000} 
+                                pathOptions={{ color: '#e30613', fillColor: '#e30613', fillOpacity: 0.1 }} 
+                              />
+                            )}
+                          </MapContainer>
+                        </div>
+
+                        {/* Legend and filter footer bar */}
+                        {geoFilter.formationTypes.length > 0 && (
+                          <div className="bg-slate-50 border-t border-slate-200 p-4 rounded-b-3xl flex flex-col lg:flex-row items-center justify-between gap-4">
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full lg:w-auto">
+                              <div className="flex items-center gap-2 text-slate-800 shrink-0">
+                                <Target className="w-5 h-5 text-primary" />
+                                <span className="text-xs font-black uppercase tracking-wider">Ton potentiel :</span>
+                              </div>
+                              
+                              <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+                                {[
+                                  { id: 'secure', label: 'Sécure', color: 'bg-emerald-500', desc: 'Note supérieure aux admis' },
+                                  { id: 'realiste', label: 'Réaliste', color: 'bg-amber-400', desc: 'Profil type' },
+                                  { id: 'ambitieux', label: 'Ambitieux', color: 'bg-rose-500', desc: 'Un peu juste' },
+                                  { id: 'sans_note', label: 'Sans note / Non classé', color: 'bg-slate-400', desc: 'Aucun seuil défini' }
+                                ].map((item) => {
+                                  const isSelected = selectedPotentialFilters.includes(item.id);
+                                  return (
+                                    <button
+                                      key={item.id}
+                                      onClick={() => {
+                                        setSelectedPotentialFilters(prev => 
+                                          prev.includes(item.id) 
+                                            ? prev.filter(id => id !== item.id) 
+                                            : [...prev, item.id]
+                                        );
+                                      }}
+                                      className={cn(
+                                        "flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all hover:bg-white shadow-xs",
+                                        isSelected 
+                                          ? "border-slate-200 bg-white text-slate-700" 
+                                          : "border-transparent bg-slate-100 text-slate-400 opacity-50 hover:opacity-100"
+                                      )}
+                                      title={item.desc}
+                                    >
+                                      <div className={cn("w-2.5 h-2.5 rounded-full shrink-0", item.color)} />
+                                      <span>{item.label}</span>
+                                      {item.id === 'sans_note' && !filterAverage && (
+                                        <span className="text-[8px] font-black uppercase tracking-wider text-amber-600 bg-amber-50 px-1 rounded ml-1">Actif</span>
+                                      )}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-3 w-full lg:w-auto border-t lg:border-t-0 pt-3 lg:pt-0 border-slate-200">
+                              <span className="text-xs font-bold text-slate-500 shrink-0">Ta moyenne :</span>
+                              <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-sm w-full sm:w-auto">
+                                <input 
+                                  type="text" 
+                                  inputMode="decimal"
+                                  placeholder="Moyenne"
+                                  value={filterAverage}
+                                  onChange={(e) => setFilterAverage(e.target.value)}
+                                  className="w-16 text-center font-black text-slate-800 placeholder-slate-400 focus:outline-none text-xs"
+                                />
+                                <span className="text-xs font-bold text-slate-400 shrink-0">/ 20</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  }
                 />
               )}
             </div>

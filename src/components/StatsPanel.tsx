@@ -104,6 +104,7 @@ interface StatsPanelProps {
   onShowOnMap?: (formation: Parcoursup2Data) => void;
   pageType: 'general' | 'pro';
   loading?: boolean;
+  mapComponent?: React.ReactNode;
 }
 
 export default function StatsPanel({ 
@@ -121,7 +122,8 @@ export default function StatsPanel({
   onFilterChange,
   onShowOnMap,
   pageType,
-  loading = false
+  loading = false,
+  mapComponent
 }: StatsPanelProps) {
   const [localUserNote, setLocalUserNote] = useState<number | null>(userNote || null);
   const [inputValue, setInputValue] = useState<string>(userNote ? userNote.toString() : '');
@@ -1034,18 +1036,21 @@ export default function StatsPanel({
             </div>
           )}
           
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center">
-                <Target className="w-6 h-6 text-emerald-600" />
-              </div>
-              <div>
-                <h4 className="text-2xl font-black text-slate-900 tracking-tight">Ton Potentiel</h4>
-                <p className="text-[10px] font-bold text-slate-400 mt-0.5">change ta moyenne attendue pour voir tes chances d'accès aux formations</p>
+          <div className="flex flex-col sm:flex-row items-start sm:flex-wrap lg:flex-nowrap lg:items-center justify-between mb-6 gap-6">
+            <div className="flex items-center justify-between w-full lg:w-auto">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center">
+                  <Target className="w-6 h-6 text-emerald-600" />
+                </div>
+                <div>
+                  <h4 className="text-2xl font-black text-slate-900 tracking-tight">Ton Potentiel</h4>
+                  <p className="text-[10px] font-bold text-slate-400 mt-0.5">change ta moyenne attendue pour voir tes chances d'accès aux formations</p>
+                </div>
               </div>
             </div>
+            
             {localUserNote !== null && (
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-4 shrink-0">
                 <div className="px-6 py-3 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-4 shadow-inner">
                   <div className="flex flex-col">
                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Ta Note</span>
@@ -1065,6 +1070,14 @@ export default function StatsPanel({
                 </div>
               </div>
             )}
+          </div>
+          
+          <div className="mb-8 text-[10px] text-slate-500 italic bg-slate-50 p-3 rounded-xl border border-slate-200 flex items-start gap-3 shadow-sm">
+            <div className="w-1.5 h-full bg-amber-400 rounded-full shrink-0"></div>
+            <p className="leading-relaxed">
+              <span className="font-bold text-slate-700 not-italic mr-1">À noter :</span> 
+              potentiel calculé à partir de l'ensemble des candidats et de l'ensemble de spécialité, pour des information sur le potentiel de ton profil exact on t'invite à consulter la section <span className="font-semibold text-slate-700">"Visualiser les chiffres d'accès à la formation"</span> présente dans la page Parcoursup dédiée à la formation accessible via le bouton voir.
+            </p>
           </div>
           
           <div className="space-y-10">
@@ -1331,17 +1344,26 @@ export default function StatsPanel({
         </div>
       </div>
 
+      {mapComponent && (
+        <div className="mb-12">
+          {mapComponent}
+        </div>
+      )}
+
       {/* Points clés Section */}
       <div className="bg-slate-900 p-12 md:p-20 rounded-[5rem] text-white shadow-2xl shadow-slate-900/40 relative overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
           <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/10 rounded-full blur-[120px] -translate-y-1/2 translate-x-1/2" />
         </div>
 
-        <div className="flex items-center gap-4 mb-16 relative z-10">
-          <div className="w-16 h-16 bg-white/10 rounded-[1.5rem] flex items-center justify-center backdrop-blur-md">
+        <div className="flex items-start gap-4 mb-16 relative z-10">
+          <div className="w-16 h-16 bg-white/10 rounded-[1.5rem] flex items-center justify-center backdrop-blur-md shrink-0">
             <Lightbulb className="w-8 h-8 text-primary" />
           </div>
-          <h4 className="text-4xl font-black tracking-tight leading-tight">Points clés à retenir</h4>
+          <div>
+            <h4 className="text-4xl font-black tracking-tight leading-tight">Points clés à retenir</h4>
+            <p className="text-slate-400 mt-2 font-medium text-lg">Basé sur les formations et filtres actuellement appliqués</p>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 relative z-10">
